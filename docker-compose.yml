@@ -1,0 +1,51 @@
+services:
+
+  # ── Backend ────────────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: hotel-tower-backend
+    environment:
+      DATABASE_URL: sqlite+aiosqlite:////data/hotel_control_tower.db
+      DEBUG: "false"
+      ALLOWED_ORIGINS: "http://localhost:5173,http://localhost:80,http://frontend"
+      APP_NAME: "Hotel Control Tower"
+      APP_VERSION: "1.0.0"
+    volumes:
+      - hotel_db:/data
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - hotel-net
+    restart: unless-stopped
+
+  # ── Frontend ───────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: hotel-tower-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - hotel-net
+    restart: unless-stopped
+
+# ── Shared resources ────────────────────────────────────────────────────────
+volumes:
+  hotel_db:
+    driver: local
+
+networks:
+  hotel-net:
+    driver: bridge

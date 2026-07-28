@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.db
+*.db-shm
+*.db-wal
+.env
+.pytest_cache/
+.coverage
+dist/
+*.egg-info/
+.mypy_cache/
+
+# Node
+node_modules/
+frontend/dist/
+frontend/.env
+
+# Docker
+.dockerignore
+
+# OS
+.DS_Store
+Thumbs.db
