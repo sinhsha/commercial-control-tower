@@ -15,7 +15,7 @@ class MarketSignalService(ABC):
     """Pluggable interface for market-signal data."""
 
     @abstractmethod
-    async def get_signals(self, hotel_id: str) -> MarketSignals:
+    async def get_signals(self, hotel_id: str, hotel_adr: float = 280.0) -> MarketSignals:
         """
         Return the current market signals for *hotel_id*.
 

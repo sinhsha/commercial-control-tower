@@ -264,7 +264,7 @@ class RuleBasedRecommendationService(RecommendationService):
         else:
             events = await self._event_repo.get_active_for_hotel(hotel_id)
 
-        signals = await self._market_signal_svc.get_signals(hotel_id)
+        signals = await self._market_signal_svc.get_signals(hotel_id, hotel_adr=metrics.adr)
 
         return _Context(
             hotel_id=hotel_id,
