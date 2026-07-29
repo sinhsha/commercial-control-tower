@@ -68,6 +68,44 @@ export const eventsApi = {
     request(`/hotels/${hotelId}/events`),
 };
 
+// ── Recommendations ───────────────────────────────────────────────────────────
+
+export const recommendationsApi = {
+  list: (
+    hotelId: string,
+    params?: {
+      days?: number;
+      category?: string;
+      priority?: string;
+      status?: string;
+      limit?: number;
+      as_of?: string;
+    }
+  ): Promise<import('@/types/api').RecommendationResponse> => {
+    const p = new URLSearchParams();
+    if (params?.days) p.set('days', String(params.days));
+    if (params?.category) p.set('category', params.category);
+    if (params?.priority) p.set('priority', params.priority);
+    if (params?.status) p.set('status', params.status);
+    if (params?.limit) p.set('limit', String(params.limit));
+    if (params?.as_of) p.set('as_of', params.as_of);
+    const qs = p.toString();
+    return request(`/hotels/${hotelId}/recommendations${qs ? `?${qs}` : ''}`);
+  },
+
+  get: (
+    hotelId: string,
+    recommendationId: string,
+    params?: { days?: number; as_of?: string }
+  ): Promise<import('@/types/api').Recommendation> => {
+    const p = new URLSearchParams();
+    if (params?.days) p.set('days', String(params.days));
+    if (params?.as_of) p.set('as_of', params.as_of);
+    const qs = p.toString();
+    return request(`/hotels/${hotelId}/recommendations/${recommendationId}${qs ? `?${qs}` : ''}`);
+  },
+};
+
 // ── Adjusted forecast ─────────────────────────────────────────────────────────
 
 export const adjustedForecastApi = {

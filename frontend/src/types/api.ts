@@ -151,6 +151,84 @@ export interface AdjustedForecastResponse {
   days: AdjustedForecastDay[];
 }
 
+// ── Recommendations ──────────────────────────────────────────────────────────
+
+export type RecommendationCategory =
+  | 'pricing'
+  | 'inventory'
+  | 'restrictions'
+  | 'upgrade'
+  | 'package'
+  | 'ancillary'
+  | 'operational';
+
+export type RecommendationAction =
+  | 'increase_rate'
+  | 'reduce_rate'
+  | 'hold_rate'
+  | 'protect_premium_inventory'
+  | 'release_premium_inventory'
+  | 'hold_rooms_for_late_demand'
+  | 'close_discounted_rates'
+  | 'add_minimum_length_of_stay'
+  | 'remove_minimum_length_of_stay'
+  | 'open_paid_upgrades'
+  | 'restrict_complimentary_upgrades'
+  | 'launch_breakfast_package'
+  | 'launch_parking_package'
+  | 'launch_event_package'
+  | 'promote_late_checkout'
+  | 'alert_revenue_manager'
+  | 'alert_front_desk'
+  | 'alert_housekeeping';
+
+export type RecommendationPriority = 'critical' | 'high' | 'medium' | 'low';
+export type RecommendationConfidence = 'high' | 'medium' | 'low';
+export type RecommendationStatus = 'proposed' | 'approved' | 'rejected' | 'expired';
+
+export interface Recommendation {
+  id: string;
+  hotel_id: string;
+  category: RecommendationCategory;
+  action: RecommendationAction;
+  title: string;
+  summary: string;
+  effective_start_date: string;
+  effective_end_date: string;
+  current_value: number | null;
+  recommended_value: number | null;
+  unit: string;
+  score: number;
+  priority: RecommendationPriority;
+  confidence: RecommendationConfidence;
+  expected_revenue_impact: number;
+  expected_occupancy_impact: number;
+  reason_codes: string[];
+  supporting_factors: string[];
+  risk_flags: string[];
+  status: RecommendationStatus;
+  created_at: string;
+}
+
+export interface RecommendationSummary {
+  total: number;
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+  estimated_revenue_opportunity: number;
+}
+
+export interface RecommendationResponse {
+  hotel_id: string;
+  generated_at: string;
+  forecast_model: string;
+  adjustment_model: string;
+  recommendation_model: string;
+  summary: RecommendationSummary;
+  recommendations: Recommendation[];
+}
+
 // ── Health ────────────────────────────────────────────────────────────────────
 
 export interface HealthResponse {

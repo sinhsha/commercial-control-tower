@@ -4,6 +4,7 @@ import { useDashboard } from '@/hooks/useDashboard';
 import { useForecast } from '@/hooks/useForecast';
 import { useAdjustedForecast } from '@/hooks/useAdjustedForecast';
 import { useEvents } from '@/hooks/useEvents';
+import { useRecommendations } from '@/hooks/useRecommendations';
 import { HotelSelector } from '@/components/dashboard/HotelSelector';
 import { DashboardPanel } from '@/components/dashboard/DashboardPanel';
 import { Spinner } from '@/components/ui/Spinner';
@@ -39,6 +40,14 @@ export default function App() {
   const eventsState = useEvents(selectedHotelId);
   const eventsData = eventsState.status === 'success' ? eventsState.data.items : [];
   const eventsLoading = eventsState.status === 'loading';
+
+  // Commercial recommendations (non-fatal on error)
+  const recommendationsState = useRecommendations(selectedHotelId, 14);
+  const recommendationsData =
+    recommendationsState.status === 'success' ? recommendationsState.data : undefined;
+  const recommendationsLoading = recommendationsState.status === 'loading';
+  const recommendationsError =
+    recommendationsState.status === 'error' ? recommendationsState.error : undefined;
 
   return (
     <div
@@ -160,6 +169,9 @@ export default function App() {
             adjustedForecastLoading={adjustedForecastLoading}
             events={eventsData}
             eventsLoading={eventsLoading}
+            recommendations={recommendationsData}
+            recommendationsLoading={recommendationsLoading}
+            recommendationsError={recommendationsError}
           />
         )}
       </main>

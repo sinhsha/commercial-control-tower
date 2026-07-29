@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { format, parseISO } from 'date-fns';
-import type { AdjustedForecastResponse, DashboardSummary, DemandEvent, ForecastResponse } from '@/types/api';
+import type { AdjustedForecastResponse, DashboardSummary, DemandEvent, ForecastResponse, RecommendationResponse } from '@/types/api';
 import { KpiCard } from '@/components/ui/KpiCard';
 import { SectionCard } from '@/components/ui/SectionCard';
 import { Badge } from '@/components/ui/Badge';
@@ -8,6 +8,7 @@ import { DemandTrendChart, type ForecastMode } from '@/components/charts/DemandT
 import { OccupancyBarChart } from '@/components/charts/OccupancyBarChart';
 import { DemandSignalsPanel } from '@/components/dashboard/DemandSignalsPanel';
 import { ExplainabilityPanel } from '@/components/dashboard/ExplainabilityPanel';
+import { RecommendationsPanel } from '@/components/dashboard/RecommendationsPanel';
 
 interface DashboardPanelProps {
   data: DashboardSummary;
@@ -17,6 +18,9 @@ interface DashboardPanelProps {
   adjustedForecastLoading?: boolean;
   events?: DemandEvent[];
   eventsLoading?: boolean;
+  recommendations?: RecommendationResponse;
+  recommendationsLoading?: boolean;
+  recommendationsError?: string;
 }
 
 function occupancyBadge(pct: number): { label: string; variant: 'green' | 'yellow' | 'red' } {
@@ -80,6 +84,9 @@ export function DashboardPanel({
   adjustedForecastLoading = false,
   events = [],
   eventsLoading = false,
+  recommendations,
+  recommendationsLoading = false,
+  recommendationsError,
 }: DashboardPanelProps) {
   const [forecastMode, setForecastMode] = useState<ForecastMode>('baseline');
 
@@ -297,6 +304,35 @@ export function DashboardPanel({
           </table>
         </SectionCard>
       )}
+
+      {/* ── Commercial Recommendations section ───────────────────── */}
+      <SectionCard
+        title="Recommended Commercial Actions"
+        action={
+          recommendations != null ? (
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 600,
+                color: '#3b82d4',
+                background: '#eff6ff',
+                padding: '2px 8px',
+                borderRadius: 4,
+                letterSpacing: '0.04em',
+              }}
+            >
+              {recommendations.recommendation_model}
+            </span>
+          ) : undefined
+        }
+      >
+        <RecommendationsPanel
+          hotelId={data.hotel_id}
+          loading={recommendationsLoading}
+          error={recommendationsError}
+          data={recommendations}
+        />
+      </SectionCard>
 
       {/* ── Footer ───────────────────────────────────────────────────── */}
       <div style={{ fontSize: 11, color: '#8b949e', textAlign: 'right', marginTop: -8 }}>
