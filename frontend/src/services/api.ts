@@ -22,6 +22,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(`API ${response.status}: ${text}`);
   }
 
+  // 204 No Content — return undefined (caller typed as Promise<void>)
+  if (response.status === 204) return undefined as unknown as T;
+
   return response.json() as Promise<T>;
 }
 
@@ -63,9 +66,30 @@ export const forecastApi = {
 
 // ── Events ───────────────────────────────────────────────────────────────────
 
+export interface CreateEventPayload {
+  name: string;
+  event_type: string;
+  start_date: string;
+  end_date: string;
+  distance_miles: number;
+  expected_attendance: number;
+  impact_strength: number;
+  confidence: number;
+  status: string;
+}
+
 export const eventsApi = {
   list: (hotelId: string): Promise<EventListResponse> =>
     request(`/hotels/${hotelId}/events`),
+
+  create: (hotelId: string, payload: CreateEventPayload): Promise<import('@/types/api').DemandEvent> =>
+    request(`/hotels/${hotelId}/events`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  delete: (hotelId: string, eventId: string): Promise<void> =>
+    request(`/hotels/${hotelId}/events/${eventId}`, { method: 'DELETE' }),
 };
 
 // ── Recommendations ───────────────────────────────────────────────────────────

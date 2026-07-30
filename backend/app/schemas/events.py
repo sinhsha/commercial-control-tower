@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 EventType = Literal[
@@ -36,6 +36,26 @@ class DemandEventResponse(BaseModel):
     impact_strength: float
     confidence: float
     status: str
+
+
+class CreateDemandEventRequest(BaseModel):
+    """Payload for POST /hotels/{id}/events."""
+
+    name: str = Field(..., min_length=2, max_length=200)
+    event_type: EventType
+    start_date: date
+    end_date: date
+    distance_miles: float = Field(0.0, ge=0.0, le=500.0)
+    expected_attendance: int = Field(0, ge=0)
+    impact_strength: float = Field(0.7, ge=0.0, le=1.0)
+    confidence: float = Field(0.8, ge=0.0, le=1.0)
+    status: EventStatus = "active"
+
+    @model_validator(mode="after")
+    def end_after_start(self) -> "CreateDemandEventRequest":
+        if self.end_date < self.start_date:
+            raise ValueError("end_date must be on or after start_date")
+        return self
 
 
 class EventListResponse(BaseModel):

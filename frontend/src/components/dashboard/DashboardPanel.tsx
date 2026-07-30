@@ -18,6 +18,7 @@ interface DashboardPanelProps {
   adjustedForecastLoading?: boolean;
   events?: DemandEvent[];
   eventsLoading?: boolean;
+  onAddEvent?: () => void;
   recommendations?: RecommendationResponse;
   recommendationsLoading?: boolean;
   recommendationsError?: string;
@@ -84,6 +85,7 @@ export function DashboardPanel({
   adjustedForecastLoading = false,
   events = [],
   eventsLoading = false,
+  onAddEvent,
   recommendations,
   recommendationsLoading = false,
   recommendationsError,
@@ -256,7 +258,7 @@ export function DashboardPanel({
 
         {/* Right: demand signals panel */}
         <SectionCard title={`Demand Signals${hasEvents ? ` (${events.length})` : ''}`}>
-          <DemandSignalsPanel events={events} loading={eventsLoading} />
+          <DemandSignalsPanel events={events} loading={eventsLoading} onAddEvent={onAddEvent} />
         </SectionCard>
       </div>
 

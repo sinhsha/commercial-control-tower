@@ -7,6 +7,7 @@ import { useEvents } from '@/hooks/useEvents';
 import { useRecommendations } from '@/hooks/useRecommendations';
 import { HotelSelector } from '@/components/dashboard/HotelSelector';
 import { DashboardPanel } from '@/components/dashboard/DashboardPanel';
+import { EventPortal } from '@/components/dashboard/EventPortal';
 import { Spinner } from '@/components/ui/Spinner';
 
 export default function App() {
@@ -14,6 +15,7 @@ export default function App() {
   const { hotels, status: hotelsStatus } = hotelsState;
   const hotelsError = hotelsState.status === 'error' ? hotelsState.error : undefined;
   const [selectedHotelId, setSelectedHotelId] = useState<string | null>(null);
+  const [portalOpen, setPortalOpen] = useState(false);
 
   // Auto-select first hotel once list loads
   useEffect(() => {
@@ -48,6 +50,12 @@ export default function App() {
   const recommendationsLoading = recommendationsState.status === 'loading';
   const recommendationsError =
     recommendationsState.status === 'error' ? recommendationsState.error : undefined;
+
+  // Refetch events + recommendations after portal save
+  function handleEventSaved() {
+    eventsState.refetch();
+    recommendationsState.refetch();
+  }
 
   return (
     <div
@@ -172,9 +180,21 @@ export default function App() {
             recommendations={recommendationsData}
             recommendationsLoading={recommendationsLoading}
             recommendationsError={recommendationsError}
+            onAddEvent={() => setPortalOpen(true)}
           />
         )}
       </main>
+
+      {/* ── Event Portal modal ──────────────────────────────────────── */}
+      {portalOpen && selectedHotelId && (
+        <EventPortal
+          hotelId={selectedHotelId}
+          hotelName={hotels.find((h) => h.id === selectedHotelId)?.name ?? selectedHotelId}
+          existingEvents={eventsData}
+          onClose={() => setPortalOpen(false)}
+          onSaved={handleEventSaved}
+        />
+      )}
     </div>
   );
 }

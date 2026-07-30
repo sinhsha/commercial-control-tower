@@ -227,9 +227,10 @@ function EventCard({ event }: { event: DemandEvent }) {
 interface DemandSignalsPanelProps {
   events: DemandEvent[];
   loading?: boolean;
+  onAddEvent?: () => void;
 }
 
-export function DemandSignalsPanel({ events, loading = false }: DemandSignalsPanelProps) {
+export function DemandSignalsPanel({ events, loading = false, onAddEvent }: DemandSignalsPanelProps) {
   if (loading) {
     return (
       <div style={{ padding: '20px 0', color: '#57606a', fontSize: 13, textAlign: 'center' }}>
@@ -271,6 +272,24 @@ export function DemandSignalsPanel({ events, loading = false }: DemandSignalsPan
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {onAddEvent && (
+        <button
+          onClick={onAddEvent}
+          style={{
+            width: '100%',
+            padding: '8px 0',
+            fontSize: 12,
+            fontWeight: 700,
+            borderRadius: 6,
+            border: '1.5px dashed #3b82d4',
+            background: '#eff6ff',
+            color: '#1d4ed8',
+            cursor: 'pointer',
+          }}
+        >
+          + Add Demand Event
+        </button>
+      )}
       {positive.length > 0 && (
         <>
           <div

@@ -32,6 +32,21 @@ class EventRepository:
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
 
+    async def create(self, event: DemandEvent) -> DemandEvent:
+        self._session.add(event)
+        await self._session.flush()
+        await self._session.refresh(event)
+        return event
+
+    async def get_by_id(self, event_id: str) -> DemandEvent | None:
+        stmt = select(DemandEvent).where(DemandEvent.id == event_id)
+        result = await self._session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def delete(self, event: DemandEvent) -> None:
+        await self._session.delete(event)
+        await self._session.flush()
+
     async def get_overlapping(
         self, hotel_id: str, start: date, end: date
     ) -> list[DemandEvent]:
