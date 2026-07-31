@@ -37,6 +37,9 @@ from app.services.market_signals.base import MarketSignalService
 from app.services.market_signals.mock import MockMarketSignalService
 from app.services.recommendations.base import RecommendationService
 from app.services.recommendations.rule_based import RuleBasedRecommendationService
+from app.services.ancillaries.base import AncillaryRecommendationService
+from app.services.ancillaries.catalog import AncillaryCatalogService, SeededAncillaryCatalogService
+from app.services.ancillaries.rule_based import RuleBasedAncillaryRecommendationService
 
 
 # ── Repositories ─────────────────────────────────────────────────────────────
@@ -138,4 +141,38 @@ def get_recommendation_service(
         forecast_svc=forecast_svc,
         event_engine_svc=event_engine_svc,
         market_signal_svc=market_signal_svc,
+    )
+
+
+# ── Ancillary Revenue Engine ──────────────────────────────────────────────────
+
+def get_ancillary_catalog_service() -> AncillaryCatalogService:
+    """
+    Factory for the active ancillary catalog provider.
+
+    Swap this return value to use a DB-backed catalog:
+        return DBBackedAncillaryCatalogService(session)
+    """
+    return SeededAncillaryCatalogService()
+
+
+def get_ancillary_recommendation_service(
+    hotel_repo: Annotated[HotelRepository, Depends(get_hotel_repository)],
+    metrics_repo: Annotated[MetricsRepository, Depends(get_metrics_repository)],
+    event_repo: Annotated[EventRepository, Depends(get_event_repository)],
+    forecast_svc: Annotated[ForecastService, Depends(get_forecast_service)],
+    catalog_svc: Annotated[AncillaryCatalogService, Depends(get_ancillary_catalog_service)],
+) -> AncillaryRecommendationService:
+    """
+    Factory for the active ancillary recommendation engine.
+
+    Swap this return value to change the engine project-wide:
+        return MLAncillaryRecommendationService(...)
+    """
+    return RuleBasedAncillaryRecommendationService(
+        hotel_repo=hotel_repo,
+        metrics_repo=metrics_repo,
+        event_repo=event_repo,
+        forecast_svc=forecast_svc,
+        catalog_svc=catalog_svc,
     )

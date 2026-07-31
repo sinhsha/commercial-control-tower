@@ -92,6 +92,46 @@ export const eventsApi = {
     request(`/hotels/${hotelId}/events/${eventId}`, { method: 'DELETE' }),
 };
 
+// ── Ancillaries ───────────────────────────────────────────────────────────────
+
+export const ancillaryApi = {
+  catalog: (hotelId: string): Promise<import('@/types/api').AncillaryCatalogResponse> =>
+    request(`/hotels/${hotelId}/ancillaries`),
+
+  recommendations: (
+    hotelId: string,
+    params?: {
+      persona?: string;
+      days?: number;
+      limit?: number;
+      category?: string;
+      as_of?: string;
+    }
+  ): Promise<import('@/types/api').AncillaryRecommendationResponse> => {
+    const p = new URLSearchParams();
+    if (params?.persona) p.set('persona', params.persona);
+    if (params?.days) p.set('days', String(params.days));
+    if (params?.limit) p.set('limit', String(params.limit));
+    if (params?.category) p.set('category', params.category);
+    if (params?.as_of) p.set('as_of', params.as_of);
+    const qs = p.toString();
+    return request(`/hotels/${hotelId}/ancillary-recommendations${qs ? `?${qs}` : ''}`);
+  },
+
+  getOne: (
+    hotelId: string,
+    ancillaryCode: string,
+    params?: { persona?: string; days?: number; as_of?: string }
+  ): Promise<import('@/types/api').AncillaryRecommendation> => {
+    const p = new URLSearchParams();
+    if (params?.persona) p.set('persona', params.persona);
+    if (params?.days) p.set('days', String(params.days));
+    if (params?.as_of) p.set('as_of', params.as_of);
+    const qs = p.toString();
+    return request(`/hotels/${hotelId}/ancillary-recommendations/${ancillaryCode}${qs ? `?${qs}` : ''}`);
+  },
+};
+
 // ── Recommendations ───────────────────────────────────────────────────────────
 
 export const recommendationsApi = {

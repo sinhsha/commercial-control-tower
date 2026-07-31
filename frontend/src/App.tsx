@@ -5,10 +5,12 @@ import { useForecast } from '@/hooks/useForecast';
 import { useAdjustedForecast } from '@/hooks/useAdjustedForecast';
 import { useEvents } from '@/hooks/useEvents';
 import { useRecommendations } from '@/hooks/useRecommendations';
+import { useAncillaryRecommendations } from '@/hooks/useAncillaryRecommendations';
 import { HotelSelector } from '@/components/dashboard/HotelSelector';
 import { DashboardPanel } from '@/components/dashboard/DashboardPanel';
 import { EventPortal } from '@/components/dashboard/EventPortal';
 import { Spinner } from '@/components/ui/Spinner';
+import type { GuestPersona } from '@/types/api';
 
 export default function App() {
   const hotelsState = useHotels();
@@ -16,6 +18,7 @@ export default function App() {
   const hotelsError = hotelsState.status === 'error' ? hotelsState.error : undefined;
   const [selectedHotelId, setSelectedHotelId] = useState<string | null>(null);
   const [portalOpen, setPortalOpen] = useState(false);
+  const [ancillaryPersona, setAncillaryPersona] = useState<GuestPersona>('hotel_wide');
 
   // Auto-select first hotel once list loads
   useEffect(() => {
@@ -51,10 +54,17 @@ export default function App() {
   const recommendationsError =
     recommendationsState.status === 'error' ? recommendationsState.error : undefined;
 
+  // Ancillary recommendations (non-fatal on error)
+  const ancillaryState = useAncillaryRecommendations(selectedHotelId, ancillaryPersona, 14, 5);
+  const ancillaryData = ancillaryState.status === 'success' ? ancillaryState.data : undefined;
+  const ancillaryLoading = ancillaryState.status === 'loading';
+  const ancillaryError = ancillaryState.status === 'error' ? ancillaryState.error : undefined;
+
   // Refetch events + recommendations after portal save
   function handleEventSaved() {
     eventsState.refetch();
     recommendationsState.refetch();
+    ancillaryState.refetch();
   }
 
   return (
@@ -180,6 +190,11 @@ export default function App() {
             recommendations={recommendationsData}
             recommendationsLoading={recommendationsLoading}
             recommendationsError={recommendationsError}
+            ancillaryRecommendations={ancillaryData}
+            ancillaryLoading={ancillaryLoading}
+            ancillaryError={ancillaryError}
+            ancillaryPersona={ancillaryPersona}
+            onAncillaryPersonaChange={setAncillaryPersona}
             onAddEvent={() => setPortalOpen(true)}
           />
         )}

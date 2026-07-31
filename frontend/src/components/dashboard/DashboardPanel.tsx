@@ -1,6 +1,14 @@
 import { useState } from 'react';
 import { format, parseISO } from 'date-fns';
-import type { AdjustedForecastResponse, DashboardSummary, DemandEvent, ForecastResponse, RecommendationResponse } from '@/types/api';
+import type {
+  AdjustedForecastResponse,
+  AncillaryRecommendationResponse,
+  DashboardSummary,
+  DemandEvent,
+  ForecastResponse,
+  GuestPersona,
+  RecommendationResponse,
+} from '@/types/api';
 import { KpiCard } from '@/components/ui/KpiCard';
 import { SectionCard } from '@/components/ui/SectionCard';
 import { Badge } from '@/components/ui/Badge';
@@ -9,6 +17,8 @@ import { OccupancyBarChart } from '@/components/charts/OccupancyBarChart';
 import { DemandSignalsPanel } from '@/components/dashboard/DemandSignalsPanel';
 import { ExplainabilityPanel } from '@/components/dashboard/ExplainabilityPanel';
 import { RecommendationsPanel } from '@/components/dashboard/RecommendationsPanel';
+import { AncillaryPanel } from '@/components/dashboard/AncillaryPanel';
+import { TotalRevenueBar } from '@/components/dashboard/TotalRevenueBar';
 
 interface DashboardPanelProps {
   data: DashboardSummary;
@@ -22,6 +32,11 @@ interface DashboardPanelProps {
   recommendations?: RecommendationResponse;
   recommendationsLoading?: boolean;
   recommendationsError?: string;
+  ancillaryRecommendations?: AncillaryRecommendationResponse;
+  ancillaryLoading?: boolean;
+  ancillaryError?: string;
+  ancillaryPersona?: GuestPersona;
+  onAncillaryPersonaChange?: (p: GuestPersona) => void;
 }
 
 function occupancyBadge(pct: number): { label: string; variant: 'green' | 'yellow' | 'red' } {
@@ -89,6 +104,11 @@ export function DashboardPanel({
   recommendations,
   recommendationsLoading = false,
   recommendationsError,
+  ancillaryRecommendations,
+  ancillaryLoading = false,
+  ancillaryError,
+  ancillaryPersona = 'hotel_wide',
+  onAncillaryPersonaChange,
 }: DashboardPanelProps) {
   const [forecastMode, setForecastMode] = useState<ForecastMode>('baseline');
 
@@ -182,6 +202,14 @@ export function DashboardPanel({
           trend={data.demand_index >= 60 ? 'up' : data.demand_index >= 40 ? 'neutral' : 'down'}
         />
       </div>
+
+      {/* ── Total Revenue Bar (room + ancillary) ─────────────────────── */}
+      {(recommendations != null || ancillaryRecommendations != null) && (
+        <TotalRevenueBar
+          recommendations={recommendations}
+          ancillaryRecommendations={ancillaryRecommendations}
+        />
+      )}
 
       {/* ── AI Extension banner ──────────────────────────────────────── */}
       {(data.recommended_rate != null || data.ai_insight != null) && (
@@ -333,6 +361,37 @@ export function DashboardPanel({
           loading={recommendationsLoading}
           error={recommendationsError}
           data={recommendations}
+        />
+      </SectionCard>
+
+      {/* ── Ancillary Revenue Recommendations ───────────────────────── */}
+      <SectionCard
+        title="Ancillary Revenue Opportunities"
+        action={
+          ancillaryRecommendations != null ? (
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 600,
+                color: '#7c5cd8',
+                background: '#f3f0ff',
+                padding: '2px 8px',
+                borderRadius: 4,
+                letterSpacing: '0.04em',
+              }}
+            >
+              {ancillaryRecommendations.engine_model}
+            </span>
+          ) : undefined
+        }
+      >
+        <AncillaryPanel
+          hotelId={data.hotel_id}
+          loading={ancillaryLoading}
+          error={ancillaryError}
+          data={ancillaryRecommendations}
+          persona={ancillaryPersona}
+          onPersonaChange={onAncillaryPersonaChange ?? (() => {})}
         />
       </SectionCard>
 

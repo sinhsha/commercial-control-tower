@@ -151,6 +151,104 @@ export interface AdjustedForecastResponse {
   days: AdjustedForecastDay[];
 }
 
+// ── Ancillaries ───────────────────────────────────────────────────────────────
+
+export type GuestPersona =
+  | 'hotel_wide'
+  | 'business_traveler'
+  | 'conference_attendee'
+  | 'leisure_couple'
+  | 'family'
+  | 'resort_guest'
+  | 'ev_traveler'
+  | 'pet_traveler';
+
+export type AncillaryCategory =
+  | 'parking_transportation'
+  | 'food_beverage'
+  | 'meetings_events'
+  | 'spa_wellness'
+  | 'experiences'
+  | 'workspace'
+  | 'guest_commerce'
+  | 'pet'
+  | 'room_inventory';
+
+export interface AncillaryProduct {
+  code: string;
+  name: string;
+  description: string;
+  category: AncillaryCategory;
+  base_price: number;
+  variable_cost: number;
+  daily_capacity: number;
+  current_utilization: number;
+  revenue_impact_tier: 'high' | 'medium' | 'low';
+  is_active: boolean;
+  requires_vehicle_flag: boolean;
+  requires_ev_flag: boolean;
+  requires_pet_flag: boolean;
+  target_segments: GuestPersona[];
+  applicable_event_types: string[];
+  base_propensity: number;
+}
+
+export interface AncillaryScoreComponents {
+  propensity_score: number;
+  margin_score: number;
+  demand_relevance_score: number;
+  segment_affinity_score: number;
+  event_relevance_score: number;
+  capacity_score: number;
+  total: number;
+}
+
+export interface AncillaryRecommendation {
+  id: string;
+  hotel_id: string;
+  rank: number;
+  product: AncillaryProduct;
+  persona: GuestPersona;
+  base_price: number;
+  recommended_price: number;
+  price_change_pct: number;
+  price_change_reason: string;
+  propensity: number;
+  eligible_guests: number;
+  expected_conversions: number;
+  expected_revenue: number;
+  expected_margin: number;
+  score: number;
+  score_components: AncillaryScoreComponents;
+  confidence: 'high' | 'medium' | 'low';
+  reason_codes: string[];
+  supporting_factors: string[];
+  generated_at: string;
+}
+
+export interface AncillaryRecommendationSummary {
+  eligible_products: number;
+  shown: number;
+  total_revenue_opportunity: number;
+  total_margin_opportunity: number;
+}
+
+export interface AncillaryRecommendationResponse {
+  hotel_id: string;
+  generated_at: string;
+  engine_model: string;
+  persona: GuestPersona;
+  horizon_days: number;
+  summary: AncillaryRecommendationSummary;
+  recommendations: AncillaryRecommendation[];
+}
+
+export interface AncillaryCatalogResponse {
+  hotel_id: string;
+  total: number;
+  items: AncillaryProduct[];
+}
+
 // ── Recommendations ──────────────────────────────────────────────────────────
 
 export type RecommendationCategory =

@@ -18,14 +18,15 @@ hotel-control-tower/
 │   │   │   ├── event_engine/     # Event-adjustment engine
 │   │   │   ├── events/           # Event impact calculations
 │   │   │   ├── market_signals/   # Market signal abstraction + mock
-│   │   │   └── recommendations/  # Commercial recommendation engine ← NEW
+│   │   │   ├── recommendations/  # Commercial recommendation engine
+│   │   │   └── ancillaries/      # Ancillary Revenue Engine ← NEW
 │   │   └── repositories/     # Data access layer
 │   └── tests/
 ├── frontend/                 # React + TypeScript app (Vite)
 │   └── src/
 │       ├── components/       # Dashboard, UI primitives, Charts
-│       │   └── dashboard/    # RecommendationCard, RecommendationsPanel ← NEW
-│       ├── hooks/            # Custom React hooks (useRecommendations ← NEW)
+│       │   └── dashboard/    # RecommendationCard, AncillaryCard, AncillaryPanel, TotalRevenueBar ← NEW
+│       ├── hooks/            # Custom React hooks (useAncillaryRecommendations ← NEW)
 │       ├── services/         # API client layer
 │       └── types/            # Shared TypeScript types
 ├── docker-compose.yml
@@ -120,12 +121,55 @@ Score in [0, 100]. Priority assigned by threshold (75→critical, 55→high, 35�
 
 ---
 
+## 6 · Ancillary Revenue Optimization + Next-Best-Offer Engine ← NEW
+
+A deterministic rule-based engine for 20 ancillary products across 9 categories.
+
+### Products Catalog (20 products)
+| Code | Category | Base Price | Tier |
+|------|----------|-----------|------|
+| PARKING | Parking & Transport | $42 | High |
+| VALET | Parking & Transport | $28 | Medium |
+| EV_CHARGING | Parking & Transport | $18 | Medium |
+| SPA_BOOKING | Spa & Wellness | $120 | High |
+| MEETING_SMALL | Meetings & Events | $225 | High |
+| DAY_USE_ROOM | Room Inventory | $99 | High |
+| WORKSPACE | Workspace | $55 | High |
+| FB_DIGITAL | Food & Beverage | $38 | High |
+| … | … | … | … |
+
+### Engine Pipeline
+1. **Context Builder** — loads hotel metrics, forecast, and events from DB
+2. **Eligibility** — suppresses ineligible products (capacity, persona, flags, margin)
+3. **Dynamic Pricing** — demand/event/utilization signals adjust prices (guardrailed at ±20%/±15%)
+4. **Propensity Scoring** — deterministic formula: base\_rate + segment\_affinity + event\_boost + stay\_length + demand + capacity
+5. **Opportunity Scoring** — composite score: propensity×30 + margin×25 + demand×20 + segment×15 + event×7 + capacity×3
+6. **Rank & Limit** — top N by score
+
+### Guest Personas (8)
+`hotel_wide` · `business_traveler` · `conference_attendee` · `leisure_couple` · `family` · `resort_guest` · `ev_traveler` · `pet_traveler`
+
+### Ancillary Guardrails
+| Guardrail | Default |
+|-----------|---------|
+| `max_ancillary_price_increase_pct` | 20% |
+| `max_ancillary_price_decrease_pct` | 15% |
+| `minimum_margin_pct` | 25% |
+| `maximum_offer_count` | 5 |
+| `minimum_propensity_threshold` | 10% |
+| `suppress_at_capacity_pct` | 95% |
+
+---
+
 ## API Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/v1/hotels/{id}/recommendations` | List ranked recommendations |
+| GET | `/api/v1/hotels/{id}/recommendations` | List ranked commercial recommendations |
 | GET | `/api/v1/hotels/{id}/recommendations/{rec_id}` | Single recommendation detail |
+| GET | `/api/v1/hotels/{id}/ancillaries` | Full ancillary product catalog ← NEW |
+| GET | `/api/v1/hotels/{id}/ancillary-recommendations` | Ranked ancillary offers ← NEW |
+| GET | `/api/v1/hotels/{id}/ancillary-recommendations/{code}` | Single ancillary detail ← NEW |
 | GET | `/api/v1/hotels/{id}/forecast/adjusted` | Event-adjusted forecast |
 | GET | `/api/v1/hotels/{id}/forecast` | Baseline forecast |
 | GET | `/api/v1/hotels/{id}/events` | Active demand events |
@@ -197,13 +241,13 @@ GET /api/v1/hotels/{id}/recommendations
 
 ## Running Tests
 
-**Backend** (83 tests across 4 test files):
+**Backend** (120 tests across 5 test files):
 ```bash
 cd backend
 python -m pytest -v
 ```
 
-**Frontend** (17 tests):
+**Frontend** (33 tests across 2 test files):
 ```bash
 cd frontend
 npm test
@@ -211,23 +255,49 @@ npm test
 
 ---
 
-## Demo Scenario (Key Feature Demo)
+## Demo Scenario
 
+### Commercial Recommendations Demo
 1. **Start the app**: `docker compose up --build`
 2. **Open**: http://localhost:5173
 3. **Select a hotel** with active demand events (all seeded hotels have them)
-4. **View Recommended Commercial Actions** section at the bottom of the dashboard
-5. **Observe**: The engine detects demand events raising adjusted occupancy above 85%, and immediately recommends:
+4. **View Recommended Commercial Actions** — the engine detects events raising occupancy above 85% and recommends:
    - A guarded rate increase (e.g. +8%, capped at 12%)
    - An event-linked package (parking / late checkout depending on event type)
-   - Premium inventory protection if premium rooms are scarce
-6. **Click any recommendation card** to expand the detail view showing:
-   - Supporting demand signals
-   - Reason codes
-   - Applied guardrails
-   - Estimated revenue impact (labelled as estimate)
-7. **Use filters**: Click "Pricing", "Package", "Operational" tabs to filter by category; use the priority dropdown for "High" / "Critical" actions
-8. **Verify non-fatal**: If you stop the backend while the frontend is running, recommendations show an error banner but forecast and demand panels continue working
+5. **Click any recommendation card** to expand supporting signals, reason codes, and estimated revenue impact
+
+### Ancillary Revenue Demo ← NEW
+6. **View Ancillary Revenue Opportunities** — new section below Recommended Commercial Actions
+7. **Observe the Total Revenue Bar** — shows Room Revenue Opportunity + Ancillary Revenue Opportunity + Total (all estimates)
+8. **Switch Guest Persona** — use the dropdown to switch between:
+   - **Conference Attendee** → Meeting rooms and parking rise to the top
+   - **Leisure Couple** → Spa, pool day pass, and experiences dominate
+   - **EV Traveler** → EV Charging appears (only persona where it's eligible)
+   - **Pet Traveler** → Pet Welcome Program unlocks (gated by pet flag)
+   - **Family** → Tours, experiences, parking, and spa appear
+9. **Use category tabs** — filter to "Parking", "Spa", "Meetings", etc.
+10. **Click any ancillary card** to see:
+    - Why this offer (supporting factors + reason codes)
+    - Dynamic pricing with reason (e.g. "+10% — High demand & parking utilization")
+    - Expected value grid (eligible guests / conversions / revenue / margin — all estimates)
+    - Score breakdown (6 mini-bars showing propensity, margin, demand, segment, event, capacity contributions)
+11. **Try convention event** — add a convention event in the Event Portal → return to Ancillary panel → confirm Meeting Room and Parking scored higher (event_demand_boost reason code appears)
+12. **Verify non-fatal**: ancillary engine errors show an inline error without affecting forecast or demand panels
+
+### API Demo
+```bash
+# Full catalog
+curl http://localhost:8000/api/v1/hotels/{hotel_id}/ancillaries
+
+# Conference attendee recommendations
+curl "http://localhost:8000/api/v1/hotels/{hotel_id}/ancillary-recommendations?persona=conference_attendee&limit=5"
+
+# Leisure couple with spa filter
+curl "http://localhost:8000/api/v1/hotels/{hotel_id}/ancillary-recommendations?persona=leisure_couple&category=spa_wellness"
+
+# Single product detail
+curl "http://localhost:8000/api/v1/hotels/{hotel_id}/ancillary-recommendations/PARKING"
+```
 
 ---
 
@@ -240,7 +310,10 @@ The architecture is designed for incremental AI capability addition:
 | **Forecasting Engine** | `SeasonalBaselineForecastService` | `TimesFMForecastService` |
 | **Event Engine** | `RuleBasedEventEngineService` | `MLEventEngineService` |
 | **Recommendation Engine** | `RuleBasedRecommendationService` | `OptimiserRecommendationService` (OR-Tools / RL) |
+| **Ancillary Engine** | `RuleBasedAncillaryRecommendationService` | `MLAncillaryRecommendationService` |
+| **Propensity Scorer** | `PropensityScoringService` (deterministic) | ML propensity model (same interface) |
 | **Market Signals** | `MockMarketSignalService` | `LiveRateShopMarketSignalService` |
+| **Ancillary Catalog** | `SeededAncillaryCatalogService` | `DBBackedAncillaryCatalogService` |
 
 To swap any engine: change **one factory function** in `app/core/dependencies.py`. No API, schema, or frontend changes required.
 
