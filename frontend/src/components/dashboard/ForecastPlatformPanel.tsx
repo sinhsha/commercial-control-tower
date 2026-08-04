@@ -547,8 +547,9 @@ function BacktestChart({ hotelId }: { hotelId: string }) {
 
 // ── Section 5: Model Selector ─────────────────────────────────────────────────
 
-function ModelSelector() {
+function ModelSelector({ timesfmStatus }: { timesfmStatus: string | undefined }) {
   const [selected, setSelected] = useState<'baseline' | 'timesfm' | 'auto'>('baseline');
+  const timesfmAvailable = timesfmStatus === 'active';
 
   return (
     <div>
@@ -566,7 +567,20 @@ function ModelSelector() {
               onChange={() => setSelected(opt)}
             />
             <span style={{ fontWeight: selected === opt ? 600 : 400, color: '#1f2328', textTransform: 'capitalize' }}>
-              {opt === 'auto' ? 'Auto (eval-based)' : opt === 'timesfm' ? 'TimesFM' : 'Seasonal Baseline'}
+              {opt === 'auto' ? 'Auto (Eval-Based)' : opt === 'timesfm' ? 'TimesFM' : 'Seasonal Baseline'}
+              {opt === 'timesfm' && timesfmStatus !== undefined && (
+                <span style={{
+                  marginLeft: 6,
+                  fontSize: 10,
+                  fontWeight: 700,
+                  padding: '1px 6px',
+                  borderRadius: 4,
+                  background: timesfmAvailable ? '#dcfce7' : '#fef9c3',
+                  color: timesfmAvailable ? '#166534' : '#854d0e',
+                }}>
+                  {timesfmAvailable ? '● active' : '● degraded'}
+                </span>
+              )}
             </span>
           </label>
         ))}
@@ -584,9 +598,14 @@ function ModelSelector() {
         <strong>Selected:</strong> {selected.toUpperCase()} &nbsp;·&nbsp;
         Set <code style={{ background: '#e5e7eb', padding: '1px 4px', borderRadius: 3 }}>FORECAST_PROVIDER={selected}</code> in
         your <code style={{ background: '#e5e7eb', padding: '1px 4px', borderRadius: 3 }}>.env</code> file and restart the backend to apply.
-        {selected === 'timesfm' && (
+        {selected === 'timesfm' && !timesfmAvailable && timesfmStatus !== undefined && (
           <span style={{ color: '#d97706', marginLeft: 8 }}>
-            ⚠ TimesFM library not installed — will fall back to Seasonal Baseline.
+            ⚠ TimesFM not yet available — will fall back to Seasonal Baseline.
+          </span>
+        )}
+        {selected === 'timesfm' && timesfmAvailable && (
+          <span style={{ color: '#166534', marginLeft: 8 }}>
+            ✓ TimesFM 2.5 is ready. Model weights will be downloaded on first inference (~800 MB).
           </span>
         )}
       </div>
@@ -639,9 +658,17 @@ export function ForecastPlatformPanel({ hotelId }: ForecastPlatformPanelProps) {
 
       {/* Section 5: Model Selector */}
       <SectionCard title="Model Selector">
-        <ModelSelector />
+        <ModelSelectorWithRegistry />
       </SectionCard>
 
     </div>
   );
+}
+
+function ModelSelectorWithRegistry() {
+  const { data } = useForecastModels();
+  const timesfmEntry = data?.models.find(
+    (m: import('@/types/api').ForecastModelInfo) => m.model_id === 'timesfm'
+  );
+  return <ModelSelector timesfmStatus={timesfmEntry?.status} />;
 }
