@@ -2,8 +2,13 @@ from pathlib import Path
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 
-# Always resolve .env relative to this file (backend/app/core/config.py → backend/.env)
-_ENV_FILE = Path(__file__).resolve().parent.parent.parent / ".env"
+# Anchor all relative paths to the backend/ directory regardless of CWD.
+# The DB lives one level up at the project root (hotel-control-tower/) because
+# uvicorn runs with --app-dir backend but CWD is the project root.
+_BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
+_PROJECT_ROOT = _BACKEND_DIR.parent
+_ENV_FILE = _BACKEND_DIR / ".env"
+_DEFAULT_DB_URL = f"sqlite+aiosqlite:///{_PROJECT_ROOT / 'hotel_control_tower.db'}"
 
 
 class Settings(BaseSettings):
@@ -12,8 +17,8 @@ class Settings(BaseSettings):
     app_version: str = "1.0.0"
     debug: bool = False
 
-    # Database
-    database_url: str = "sqlite+aiosqlite:///./hotel_control_tower.db"
+    # Database — absolute path so it resolves correctly regardless of CWD
+    database_url: str = _DEFAULT_DB_URL
 
     # CORS – comma-separated list of allowed origins
     allowed_origins: str = "http://localhost:5173,http://localhost:3000"
