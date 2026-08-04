@@ -67,6 +67,13 @@ jobs:
         run: |
           ibmcloud ce project select --name "${{ secrets.CE_PROJECT }}"
 
+          # OPENAI_API_KEY is intentionally omitted here.
+          # It is an application secret, not a CI/CD secret, and must be set
+          # directly on the CE application via the IBM Cloud console or CLI:
+          #   ibmcloud ce application update --name control-tower-backend \
+          #     --env OPENAI_API_KEY=<value>
+          # Without it, the Copilot feature degrades gracefully (fallback mode)
+          # but all other functionality is unaffected.
           ibmcloud ce application update \
             --name "${{ secrets.BACKEND_APP_NAME }}" \
             --image "$ICR_HOST/${{ secrets.ICR_NAMESPACE }}/$BACKEND_IMAGE:latest" \
@@ -75,7 +82,6 @@ jobs:
             --env FORECAST_PROVIDER=baseline \
             --env TIMESFM_ENABLED=false \
             --env COPILOT_ENABLED=true \
-            --env OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
             --env OPENAI_MODEL=gpt-4o-mini \
             --env ALLOWED_ORIGINS="https://control-tower-frontend.${{ secrets.CE_SUBDOMAIN }}.us-south.codeengine.appdomain.cloud,http://localhost:5173" \
             --wait
