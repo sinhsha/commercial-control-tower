@@ -21,6 +21,7 @@ import { AncillaryPanel } from '@/components/dashboard/AncillaryPanel';
 import { TotalRevenueBar } from '@/components/dashboard/TotalRevenueBar';
 import { CopilotPanel } from '@/components/dashboard/CopilotPanel';
 import { ForecastPlatformPanel } from '@/components/dashboard/ForecastPlatformPanel';
+import { RoomPricingPanel } from '@/components/dashboard/RoomPricingPanel';
 
 interface DashboardPanelProps {
   data: DashboardSummary;
@@ -424,6 +425,9 @@ export function DashboardPanel({
           persona={ancillaryPersona ?? 'hotel_wide'}
         />
       </SectionCard>
+
+      {/* ── Dynamic Room Pricing & Inventory Optimization ────────────── */}
+      <RoomPricingPanel hotelId={data.hotel_id} />
 
       {/* ── Enterprise Forecasting Platform ─────────────────────────── */}
       <ForecastPlatformPanel hotelId={data.hotel_id} />

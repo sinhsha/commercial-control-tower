@@ -11,6 +11,7 @@ from app.api.v1.endpoints import (
     ancillaries,
     copilot,
     forecast_platform,
+    room_pricing,
 )
 
 api_router = APIRouter(prefix="/api/v1")
@@ -24,3 +25,4 @@ api_router.include_router(recommendations.router)
 api_router.include_router(ancillaries.router)
 api_router.include_router(copilot.router)
 api_router.include_router(forecast_platform.router)
+api_router.include_router(room_pricing.router)

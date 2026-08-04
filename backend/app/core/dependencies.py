@@ -43,6 +43,11 @@ from app.services.ancillaries.catalog import AncillaryCatalogService, SeededAnci
 from app.services.ancillaries.rule_based import RuleBasedAncillaryRecommendationService
 from app.services.copilot.base import CopilotService
 from app.services.copilot.openai_service import OpenAICopilotService
+# ── Room Pricing ─────────────────────────────────────────────────────────────
+from app.repositories.room_type_repository import RoomTypeRepository
+from app.services.room_pricing.base import RoomPricingService
+from app.services.room_pricing.rule_based import RuleBasedRoomPricingService
+
 # ── Enterprise Forecasting Platform ──────────────────────────────────────────
 from app.services.forecasting.model_registry import ForecastModelRegistry, get_default_registry
 from app.services.forecasting.evaluation import ForecastEvaluationService
@@ -54,6 +59,12 @@ from app.services.forecasting.manager import ForecastManagerService
 
 
 # ── Repositories ─────────────────────────────────────────────────────────────
+
+def get_room_type_repository(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> RoomTypeRepository:
+    return RoomTypeRepository(session)
+
 
 def get_hotel_repository(
     session: Annotated[AsyncSession, Depends(get_db_session)],
@@ -186,6 +197,32 @@ def get_ancillary_recommendation_service(
         event_repo=event_repo,
         forecast_svc=forecast_svc,
         catalog_svc=catalog_svc,
+    )
+
+
+# ── Room Pricing Service ──────────────────────────────────────────────────────
+
+def get_room_pricing_service(
+    hotel_repo: Annotated[HotelRepository, Depends(get_hotel_repository)],
+    metrics_repo: Annotated[MetricsRepository, Depends(get_metrics_repository)],
+    event_repo: Annotated[EventRepository, Depends(get_event_repository)],
+    forecast_svc: Annotated[ForecastService, Depends(get_forecast_service)],
+    market_svc: Annotated[MarketSignalService, Depends(get_market_signal_service)],
+    room_repo: Annotated[RoomTypeRepository, Depends(get_room_type_repository)],
+) -> RoomPricingService:
+    """
+    Factory for the active room pricing engine.
+
+    Swap this return value to change the engine project-wide:
+        return MLRoomPricingService(...)
+    """
+    return RuleBasedRoomPricingService(
+        hotel_repo=hotel_repo,
+        metrics_repo=metrics_repo,
+        event_repo=event_repo,
+        forecast_svc=forecast_svc,
+        market_svc=market_svc,
+        room_repo=room_repo,
     )
 
 

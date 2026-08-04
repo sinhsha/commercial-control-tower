@@ -17,6 +17,7 @@ from sqlalchemy import select, func
 from app.models.hotel import Hotel
 from app.models.daily_metrics import DailyMetrics
 from app.models.room import Room
+from app.models.room_type import RoomType
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +85,90 @@ _ROOM_TYPES = [
     ("Deluxe", 0.35),
     ("Junior Suite", 0.15),
     ("Suite", 0.10),
+]
+
+# Room types to seed per hotel (Marriott-style pricing)
+_ROOM_TYPE_SEED = [
+    {
+        "code": "STANDARD_KING",
+        "display_name": "Standard King",
+        "capacity": 2,
+        "base_rate": 189.0,
+        "premium_factor": 1.0,
+        "inventory_count": 60,
+        "upgrade_priority": 1,
+        "room_rank": 1,
+    },
+    {
+        "code": "DOUBLE_QUEEN",
+        "display_name": "Double Queen",
+        "capacity": 4,
+        "base_rate": 209.0,
+        "premium_factor": 1.1,
+        "inventory_count": 50,
+        "upgrade_priority": 2,
+        "room_rank": 2,
+    },
+    {
+        "code": "DELUXE_KING",
+        "display_name": "Deluxe King",
+        "capacity": 2,
+        "base_rate": 239.0,
+        "premium_factor": 1.25,
+        "inventory_count": 40,
+        "upgrade_priority": 3,
+        "room_rank": 3,
+    },
+    {
+        "code": "EXEC_KING",
+        "display_name": "Executive King",
+        "capacity": 2,
+        "base_rate": 279.0,
+        "premium_factor": 1.45,
+        "inventory_count": 30,
+        "upgrade_priority": 4,
+        "room_rank": 4,
+    },
+    {
+        "code": "CLUB_LEVEL",
+        "display_name": "Club Level",
+        "capacity": 2,
+        "base_rate": 319.0,
+        "premium_factor": 1.6,
+        "inventory_count": 20,
+        "upgrade_priority": 5,
+        "room_rank": 5,
+    },
+    {
+        "code": "JR_SUITE",
+        "display_name": "Junior Suite",
+        "capacity": 3,
+        "base_rate": 399.0,
+        "premium_factor": 1.9,
+        "inventory_count": 15,
+        "upgrade_priority": 6,
+        "room_rank": 6,
+    },
+    {
+        "code": "EXEC_SUITE",
+        "display_name": "Executive Suite",
+        "capacity": 4,
+        "base_rate": 499.0,
+        "premium_factor": 2.3,
+        "inventory_count": 8,
+        "upgrade_priority": 7,
+        "room_rank": 7,
+    },
+    {
+        "code": "PRESIDENTIAL",
+        "display_name": "Presidential Suite",
+        "capacity": 6,
+        "base_rate": 799.0,
+        "premium_factor": 3.5,
+        "inventory_count": 2,
+        "upgrade_priority": 8,
+        "room_rank": 8,
+    },
 ]
 
 
@@ -199,5 +284,47 @@ async def seed_database(session: AsyncSession, days: int = 90) -> None:
     all_hotels = list(result.scalars().all())
     await seed_events(session, all_hotels)
 
+    # Seed room types for each hotel
+    for hotel in all_hotels:
+        await seed_room_types(session, hotel.id)
+
     await session.commit()
     logger.info("Seeding complete.")
+
+
+async def seed_room_types(session: AsyncSession, hotel_id: str) -> None:
+    """Seed 8 Marriott-style room types for a hotel.  Idempotent."""
+    from sqlalchemy import select as sa_select
+
+    existing = await session.execute(
+        sa_select(RoomType).where(RoomType.hotel_id == hotel_id)
+    )
+    if existing.scalars().first() is not None:
+        return  # already seeded
+
+    for rt in _ROOM_TYPE_SEED:
+        base = rt["base_rate"]
+        minimum_price = round(base * 0.70, 2)
+        maximum_price = round(base * 2.50, 2)
+        # Start with ~70% availability
+        available = max(1, int(rt["inventory_count"] * 0.70))
+        session.add(
+            RoomType(
+                hotel_id=hotel_id,
+                code=rt["code"],
+                display_name=rt["display_name"],
+                capacity=rt["capacity"],
+                base_rate=base,
+                premium_factor=rt["premium_factor"],
+                inventory_count=rt["inventory_count"],
+                current_available=available,
+                upgrade_priority=rt["upgrade_priority"],
+                minimum_price=minimum_price,
+                maximum_price=maximum_price,
+                current_price=base,
+                room_rank=rt["room_rank"],
+                is_active=True,
+            )
+        )
+    await session.flush()
+    logger.info("  ✓ Seeded %d room types for hotel %s", len(_ROOM_TYPE_SEED), hotel_id)

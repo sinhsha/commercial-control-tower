@@ -535,3 +535,99 @@ export interface ManagedForecastResult {
   warnings: string[];
   forecast: ForecastPoint[];
 }
+
+// ── Room Pricing & Inventory Optimization ─────────────────────────────────────
+
+export type ProtectionStatus = 'open' | 'protected' | 'hold' | 'closed';
+export type PricingConfidence = 'high' | 'medium' | 'low';
+export type LosRecommendation = 'min_2' | 'min_3' | 'close_arrival' | 'open_arrival' | null;
+
+export interface RoomTypePricingRecommendation {
+  room_type_id: string;
+  code: string;
+  display_name: string;
+  room_rank: number;
+  capacity: number;
+  inventory_count: number;
+  current_available: number;
+  current_price: number;
+  recommended_price: number;
+  price_change_pct: number;
+  minimum_price: number;
+  maximum_price: number;
+  demand_multiplier: number;
+  scarcity_multiplier: number;
+  competitor_multiplier: number;
+  premium_factor: number;
+  confidence: PricingConfidence;
+  reason_codes: string[];
+  supporting_factors: string[];
+  guardrails_applied: string[];
+  protection_status: ProtectionStatus;
+  upgrade_recommendation: string | null;
+  los_recommendation: LosRecommendation;
+}
+
+export interface RoomPricingResponse {
+  hotel_id: string;
+  generated_at: string;
+  as_of_date: string;
+  forecast_occupancy_pct: number;
+  competitor_adr: number;
+  active_events: Array<Record<string, unknown>>;
+  recommendations: RoomTypePricingRecommendation[];
+  projected_adr: number;
+  projected_revpar: number;
+  projected_room_revenue: number;
+  projected_occupancy_pct: number;
+  projected_revenue_opportunity: number;
+}
+
+export interface RoomCalendarDay {
+  date: string;
+  recommended_price: number;
+  current_price: number;
+  price_change_pct: number;
+  confidence: string;
+  forecast_occupancy_pct: number;
+  protection_status: string;
+}
+
+export interface RoomTypeCalendar {
+  room_type_id: string;
+  code: string;
+  display_name: string;
+  room_rank: number;
+  days: RoomCalendarDay[];
+}
+
+export interface RoomCalendarResponse {
+  hotel_id: string;
+  generated_at: string;
+  horizon_days: number;
+  room_types: RoomTypeCalendar[];
+}
+
+export interface InventoryStatus {
+  room_type_id: string;
+  code: string;
+  display_name: string;
+  room_rank: number;
+  inventory_count: number;
+  sold: number;
+  remaining: number;
+  occupancy_pct: number;
+  protection_status: string;
+  upgrade_eligible: boolean;
+  revenue_at_risk: number;
+}
+
+export interface InventoryResponse {
+  hotel_id: string;
+  as_of_date: string;
+  total_rooms: number;
+  total_sold: number;
+  total_available: number;
+  overall_occupancy_pct: number;
+  room_types: InventoryStatus[];
+}

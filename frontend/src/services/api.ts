@@ -266,3 +266,51 @@ export const forecastPlatformApi = {
     return request(`/forecast/backtest?${p}`);
   },
 };
+
+// ── Room Pricing ──────────────────────────────────────────────────────────────
+
+export const roomPricingApi = {
+  recommendations: (
+    hotelId: string,
+    params?: { as_of?: string; days?: number }
+  ): Promise<import('@/types/api').RoomPricingResponse> => {
+    const p = new URLSearchParams();
+    if (params?.as_of) p.set('as_of', params.as_of);
+    if (params?.days != null) p.set('days', String(params.days));
+    const qs = p.toString();
+    return request(`/hotels/${hotelId}/room-pricing${qs ? `?${qs}` : ''}`);
+  },
+
+  calendar: (
+    hotelId: string,
+    params?: { as_of?: string; days?: number }
+  ): Promise<import('@/types/api').RoomCalendarResponse> => {
+    const p = new URLSearchParams();
+    if (params?.as_of) p.set('as_of', params.as_of);
+    if (params?.days != null) p.set('days', String(params.days));
+    const qs = p.toString();
+    return request(`/hotels/${hotelId}/room-calendar${qs ? `?${qs}` : ''}`);
+  },
+
+  inventory: (
+    hotelId: string,
+    params?: { as_of?: string }
+  ): Promise<import('@/types/api').InventoryResponse> => {
+    const p = new URLSearchParams();
+    if (params?.as_of) p.set('as_of', params.as_of);
+    const qs = p.toString();
+    return request(`/hotels/${hotelId}/inventory${qs ? `?${qs}` : ''}`);
+  },
+
+  explanation: (
+    hotelId: string,
+    roomCode: string,
+    params?: { as_of?: string; days?: number }
+  ): Promise<import('@/types/api').RoomTypePricingRecommendation> => {
+    const p = new URLSearchParams();
+    if (params?.as_of) p.set('as_of', params.as_of);
+    if (params?.days != null) p.set('days', String(params.days));
+    const qs = p.toString();
+    return request(`/hotels/${hotelId}/pricing-explanation/${roomCode}${qs ? `?${qs}` : ''}`);
+  },
+};

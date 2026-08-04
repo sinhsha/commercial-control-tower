@@ -3,3 +3,4 @@ from app.models.hotel import Hotel  # noqa: F401
 from app.models.daily_metrics import DailyMetrics  # noqa: F401
 from app.models.room import Room  # noqa: F401
 from app.models.demand_event import DemandEvent  # noqa: F401
+from app.models.room_type import RoomType  # noqa: F401
