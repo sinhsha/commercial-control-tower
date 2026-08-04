@@ -1,0 +1,28 @@
+# requirements-ce.txt
+# IBM Cloud Code Engine build — lightweight variant.
+#
+# Differences from requirements.txt:
+#   - torch>=2.13.0   REMOVED  (2-4 GB; not needed; TimesFM degrades gracefully to baseline)
+#   - timesfm==2.0.2  REMOVED  (requires torch; app marks model "degraded" and uses baseline)
+#   - openai>=1.30.0  RETAINED (Copilot; degrades gracefully if OPENAI_API_KEY absent)
+#
+# Set these env vars on the CE app:
+#   FORECAST_PROVIDER=baseline
+#   TIMESFM_ENABLED=false
+#   COPILOT_ENABLED=true
+#   OPENAI_API_KEY=<sk-...>   (or leave empty for structured fallback text)
+
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+sqlalchemy==2.0.30
+alembic==1.13.1
+pydantic==2.7.1
+pydantic-settings==2.2.1
+python-dotenv==1.0.1
+httpx==0.27.0
+pytest==8.2.0
+pytest-asyncio==0.23.6
+anyio==4.3.0
+aiosqlite==0.20.0
+greenlet==3.0.3
+openai>=1.30.0

@@ -7,9 +7,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Allow CI to substitute requirements-ce.txt (strips torch/timesfm for CE builds)
+ARG REQUIREMENTS_FILE=requirements.txt
+
+# Upgrade pip before installing deps.
+# python:3.12-slim ships with pip 25.0.1 which has several high CVEs
+# (GHSA-4xh5-x5gv-qwph, GHSA-wf93-45jw-7689, GHSA-58qw-9mgm-455v, etc.).
+# Fixed in pip 25.3. This single line resolves all of them.
+RUN pip install --no-cache-dir --upgrade pip
+
 # Python deps
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements.txt requirements-ce.txt ./
+RUN pip install --no-cache-dir -r "${REQUIREMENTS_FILE}"
 
 # Application code
 COPY . .

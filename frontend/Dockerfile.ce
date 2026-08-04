@@ -1,0 +1,81 @@
+# Dockerfile.ce
+# Code Engine frontend image — self-contained, no external file dependencies.
+#
+# Key differences from frontend/Dockerfile:
+#   - Node 24-alpine builder (fixes brace-expansion GHSA-mh99-v99m-4gvg)
+#   - nginx.conf is written inline via heredoc (no deployment/ folder in build context)
+#   - NGINX_BACKEND_URL is a build ARG substituted into nginx.conf by envsubst at build time
+#   - Platform must be explicitly linux/amd64 for CE (Apple Silicon Podman defaults to arm64)
+#   - Podman must use --format docker (OCI format silently drops HEALTHCHECK; CE needs it)
+#
+# Build (from repo root, after cd commercial-control-tower/):
+#   podman build \
+#     --platform linux/amd64 \
+#     --format docker \
+#     --build-arg NGINX_BACKEND_URL=https://control-tower-backend.2cz4z9e2j76q.us-south.codeengine.appdomain.cloud \
+#     -t us.icr.io/marriott-poc/control-tower-frontend:latest \
+#     -f frontend/Dockerfile.ce \
+#     ./frontend
+#
+# In GitHub Actions the ARG is injected from the backend job output.
+
+# ── Builder ────────────────────────────────────────────────────────────────────
+FROM --platform=linux/amd64 node:24-alpine AS builder
+
+WORKDIR /app
+
+COPY package.json ./
+
+# brace-expansion vulnerability fix (GHSA-mh99-v99m-4gvg)
+RUN npm install --frozen-lockfile 2>/dev/null || npm install
+
+COPY . .
+RUN npm run build
+
+# ── Production ─────────────────────────────────────────────────────────────────
+FROM --platform=linux/amd64 nginx:1.27-alpine
+
+# Backend URL injected at build time by the pipeline
+ARG NGINX_BACKEND_URL
+
+# Write nginx config inline with envsubst substitution so no external file is needed
+RUN printf 'server {\n\
+    listen 80;\n\
+    server_name _;\n\
+    root /usr/share/nginx/html;\n\
+    index index.html;\n\
+\n\
+    location /health {\n\
+        return 200 '"'"'ok'"'"';\n\
+        add_header Content-Type text/plain;\n\
+    }\n\
+\n\
+    location /api/ {\n\
+        proxy_pass %s;\n\
+        proxy_http_version 1.1;\n\
+        proxy_set_header Host $proxy_host;\n\
+        proxy_set_header Connection "";\n\
+        proxy_set_header X-Real-IP $remote_addr;\n\
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n\
+        proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;\n\
+        proxy_ssl_server_name on;\n\
+    }\n\
+\n\
+    location / {\n\
+        try_files $uri $uri/ /index.html;\n\
+    }\n\
+\n\
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff2?)$ {\n\
+        expires 1y;\n\
+        add_header Cache-Control "public, immutable";\n\
+    }\n\
+}\n' "${NGINX_BACKEND_URL}" > /etc/nginx/conf.d/default.conf
+
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+EXPOSE 80
+
+HEALTHCHECK --interval=15s --timeout=5s --start-period=5s --retries=3 \
+  CMD wget -qO- http://localhost/health || exit 1
+
+CMD ["nginx", "-g", "daemon off;"]
