@@ -438,3 +438,100 @@ export interface ExplainCommercialRequest {
 export interface ExplainAncillaryRequest {
   grounding: AncillaryGrounding;
 }
+
+// ── Enterprise Forecasting Platform ───────────────────────────────────────────
+
+export type ForecastModelStatus = 'active' | 'inactive' | 'degraded';
+
+export interface ForecastModelInfo {
+  model_id: string;
+  name: string;
+  version: string;
+  provider: string;
+  device: string;
+  supported_horizons: number[];
+  capabilities: string[];
+  status: ForecastModelStatus;
+}
+
+export interface ForecastModelListResponse {
+  total: number;
+  models: ForecastModelInfo[];
+}
+
+export interface EvaluationMetrics {
+  model_id: string;
+  model_name: string;
+  window: string;
+  mae: number;
+  rmse: number;
+  mape: number;
+  wape: number;
+  bias: number;
+  mean_error: number;
+  coverage: number;
+  runtime_ms: number;
+  evaluated_at: string;
+}
+
+/** Alias — matches the backend EvaluationResult schema. */
+export type EvaluationResult = EvaluationMetrics;
+
+export interface ComparisonResult {
+  hotel_id: string;
+  window: string;
+  models: EvaluationMetrics[];
+  recommended_model_id: string;
+  evaluated_at: string;
+}
+
+export type ForecastHealthStatusLevel = 'healthy' | 'warning' | 'degraded';
+
+export interface ForecastHealthStatus {
+  hotel_id: string;
+  status: ForecastHealthStatusLevel;
+  active_model: string;
+  active_model_version: string;
+  fallback_active: boolean;
+  last_validation: string;
+  warnings: string[];
+}
+
+export interface BacktestPoint {
+  date: string;
+  actual: number;
+  predicted: number;
+  lower_bound: number;
+  upper_bound: number;
+  residual: number;
+}
+
+export interface BacktestResult {
+  model_id: string;
+  model_name: string;
+  window: string;
+  points: BacktestPoint[];
+  mae: number;
+  rmse: number;
+  bias: number;
+}
+
+/** Enriched forecast response returned by the ForecastManagerService. */
+export interface ManagedForecastResult {
+  forecast_id: string;
+  hotel_id: string;
+  model_used: string;
+  model_version: string;
+  generated_at: string;
+  runtime_ms: number;
+  device: string;
+  training_context_days: number;
+  prediction_horizon: number;
+  validation_status: 'passed' | 'warning' | 'failed';
+  fallback_used: boolean;
+  fallback_reason: string | null;
+  confidence_score: number;
+  evaluation_metrics: EvaluationMetrics | null;
+  warnings: string[];
+  forecast: ForecastPoint[];
+}

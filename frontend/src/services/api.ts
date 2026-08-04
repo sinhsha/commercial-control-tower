@@ -227,3 +227,42 @@ export const copilotApi = {
 export const healthApi = {
   check: (): Promise<HealthResponse> => request('/health'),
 };
+
+// ── Forecast Platform ─────────────────────────────────────────────────────────
+
+export const forecastPlatformApi = {
+  models: (): Promise<import('@/types/api').ForecastModelListResponse> =>
+    request('/forecast/models'),
+
+  evaluation: (
+    hotelId: string,
+    params?: { window?: string; model?: string }
+  ): Promise<import('@/types/api').EvaluationResult> => {
+    const p = new URLSearchParams({ hotel_id: hotelId });
+    if (params?.window) p.set('window', params.window);
+    if (params?.model) p.set('model', params.model);
+    return request(`/forecast/evaluation?${p}`);
+  },
+
+  comparison: (
+    hotelId: string,
+    days?: number
+  ): Promise<import('@/types/api').ComparisonResult> => {
+    const p = new URLSearchParams({ hotel_id: hotelId });
+    if (days != null) p.set('days', String(days));
+    return request(`/forecast/comparison?${p}`);
+  },
+
+  health: (hotelId: string): Promise<import('@/types/api').ForecastHealthStatus> =>
+    request(`/forecast/health?hotel_id=${encodeURIComponent(hotelId)}`),
+
+  backtest: (
+    hotelId: string,
+    params?: { window?: string; model?: string }
+  ): Promise<import('@/types/api').BacktestResult> => {
+    const p = new URLSearchParams({ hotel_id: hotelId });
+    if (params?.window) p.set('window', params.window);
+    if (params?.model) p.set('model', params.model);
+    return request(`/forecast/backtest?${p}`);
+  },
+};

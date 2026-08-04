@@ -21,6 +21,7 @@ from typing import Annotated
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.db.session import get_db_session
 from app.repositories.hotel_repository import HotelRepository
 from app.repositories.metrics_repository import MetricsRepository
@@ -42,6 +43,14 @@ from app.services.ancillaries.catalog import AncillaryCatalogService, SeededAnci
 from app.services.ancillaries.rule_based import RuleBasedAncillaryRecommendationService
 from app.services.copilot.base import CopilotService
 from app.services.copilot.openai_service import OpenAICopilotService
+# ── Enterprise Forecasting Platform ──────────────────────────────────────────
+from app.services.forecasting.model_registry import ForecastModelRegistry, get_default_registry
+from app.services.forecasting.evaluation import ForecastEvaluationService
+from app.services.forecasting.governance import ForecastGovernanceService
+from app.services.forecasting.comparison import ForecastComparisonService
+from app.services.forecasting.auto_selector import AutoModelSelector
+from app.services.forecasting.timesfm_service import TimesFMForecastService
+from app.services.forecasting.manager import ForecastManagerService
 
 
 # ── Repositories ─────────────────────────────────────────────────────────────
@@ -195,3 +204,76 @@ def get_copilot_service() -> CopilotService:
     All other dashboard panels are unaffected.
     """
     return OpenAICopilotService()
+
+
+# ── Enterprise Forecasting Platform ───────────────────────────────────────────
+
+def get_forecast_model_registry() -> ForecastModelRegistry:
+    """Returns the module-level singleton model registry."""
+    return get_default_registry()
+
+
+def get_forecast_evaluation_service() -> ForecastEvaluationService:
+    """Evaluation service backed by the SeasonalBaseline model."""
+    return ForecastEvaluationService(SeasonalBaselineForecastService())
+
+
+def get_forecast_governance_service() -> ForecastGovernanceService:
+    """Governance service with default thresholds from settings."""
+    settings = get_settings()
+    return ForecastGovernanceService(
+        fallback_svc=SeasonalBaselineForecastService(),
+        max_jump_pp=settings.forecast_governance_max_jump_pp,
+        min_history_days=settings.forecast_governance_min_history_days,
+    )
+
+
+def get_forecast_comparison_service(
+    registry: Annotated[ForecastModelRegistry, Depends(get_forecast_model_registry)],
+    eval_svc: Annotated[ForecastEvaluationService, Depends(get_forecast_evaluation_service)],
+) -> ForecastComparisonService:
+    """Comparison service for all registered models."""
+    return ForecastComparisonService(
+        registry=registry,
+        baseline_eval_svc=eval_svc,
+        timesfm_eval_svc=None,  # TimesFM uses same evaluation pathway via fallback
+    )
+
+
+def get_auto_model_selector(
+    comparison_svc: Annotated[ForecastComparisonService, Depends(get_forecast_comparison_service)],
+) -> AutoModelSelector:
+    """Auto model selector with TTL cache."""
+    settings = get_settings()
+    return AutoModelSelector(
+        comparison_svc=comparison_svc,
+        ttl_seconds=settings.forecast_auto_selector_ttl_seconds,
+        window="last_30",
+    )
+
+
+def get_forecast_manager_service(
+    governance_svc: Annotated[ForecastGovernanceService, Depends(get_forecast_governance_service)],
+    auto_selector: Annotated[AutoModelSelector, Depends(get_auto_model_selector)],
+    eval_svc: Annotated[ForecastEvaluationService, Depends(get_forecast_evaluation_service)],
+    registry: Annotated[ForecastModelRegistry, Depends(get_forecast_model_registry)],
+) -> ForecastManagerService:
+    """Orchestrating manager service."""
+    settings = get_settings()
+    baseline_svc = SeasonalBaselineForecastService()
+    timesfm_svc = TimesFMForecastService(
+        timeout_seconds=settings.timesfm_timeout_seconds,
+        device=settings.timesfm_device,
+        model_name_hf=settings.timesfm_model_name,
+        context_length=settings.timesfm_context_length,
+        prediction_length=settings.timesfm_prediction_length,
+    )
+    return ForecastManagerService(
+        provider=settings.forecast_provider,
+        registry=registry,
+        baseline_svc=baseline_svc,
+        timesfm_svc=timesfm_svc,
+        governance_svc=governance_svc,
+        auto_selector=auto_selector,
+        eval_svc=eval_svc,
+    )

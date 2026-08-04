@@ -20,6 +20,7 @@ import { RecommendationsPanel } from '@/components/dashboard/RecommendationsPane
 import { AncillaryPanel } from '@/components/dashboard/AncillaryPanel';
 import { TotalRevenueBar } from '@/components/dashboard/TotalRevenueBar';
 import { CopilotPanel } from '@/components/dashboard/CopilotPanel';
+import { ForecastPlatformPanel } from '@/components/dashboard/ForecastPlatformPanel';
 
 interface DashboardPanelProps {
   data: DashboardSummary;
@@ -423,6 +424,9 @@ export function DashboardPanel({
           persona={ancillaryPersona ?? 'hotel_wide'}
         />
       </SectionCard>
+
+      {/* ── Enterprise Forecasting Platform ─────────────────────────── */}
+      <ForecastPlatformPanel hotelId={data.hotel_id} />
 
       {/* ── Footer ───────────────────────────────────────────────────── */}
       <div style={{ fontSize: 11, color: '#8b949e', textAlign: 'right', marginTop: -8 }}>

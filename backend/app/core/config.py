@@ -28,6 +28,19 @@ class Settings(BaseSettings):
     copilot_enabled: bool = True
     copilot_max_tokens: int = 600
 
+    # Enterprise Forecasting Platform
+    forecast_provider: str = "baseline"          # baseline | timesfm | auto
+    timesfm_enabled: bool = False
+    timesfm_timeout_seconds: float = 10.0
+    timesfm_model_name: str = "google/timesfm-1.0-200m"
+    timesfm_context_length: int = 512
+    timesfm_prediction_length: int = 96
+    timesfm_device: str = "cpu"
+    forecast_evaluation_window: str = "last_30"
+    forecast_governance_max_jump_pp: float = 30.0
+    forecast_governance_min_history_days: int = 14
+    forecast_auto_selector_ttl_seconds: int = 3600
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
     @property
