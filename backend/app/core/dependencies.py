@@ -264,9 +264,8 @@ def get_forecast_manager_service(
     timesfm_svc = TimesFMForecastService(
         timeout_seconds=settings.timesfm_timeout_seconds,
         device=settings.timesfm_device,
-        model_name_hf=settings.timesfm_model_name,
+        repo_id=settings.timesfm_model_name,
         context_length=settings.timesfm_context_length,
-        prediction_length=settings.timesfm_prediction_length,
     )
     return ForecastManagerService(
         provider=settings.forecast_provider,

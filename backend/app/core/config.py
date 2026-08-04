@@ -30,11 +30,10 @@ class Settings(BaseSettings):
 
     # Enterprise Forecasting Platform
     forecast_provider: str = "baseline"          # baseline | timesfm | auto
-    timesfm_enabled: bool = False
-    timesfm_timeout_seconds: float = 10.0
-    timesfm_model_name: str = "google/timesfm-1.0-200m"
+    timesfm_enabled: bool = True
+    timesfm_timeout_seconds: float = 60.0
+    timesfm_model_name: str = "google/timesfm-2.5-200m-pytorch"
     timesfm_context_length: int = 512
-    timesfm_prediction_length: int = 96
     timesfm_device: str = "cpu"
     forecast_evaluation_window: str = "last_30"
     forecast_governance_max_jump_pp: float = 30.0

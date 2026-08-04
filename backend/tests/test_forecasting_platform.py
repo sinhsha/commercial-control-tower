@@ -145,16 +145,17 @@ class TestTimesFMFallback:
 
     @pytest.mark.anyio
     async def test_falls_back_when_not_installed(self) -> None:
-        """Test 4 — TimesFM not installed → fallback to SeasonalBaseline."""
+        """Test 4 — TimesFM marked unavailable → fallback to SeasonalBaseline."""
         svc = TimesFMForecastService()
-        # timesfm is not installed in test env, so _available should be False
+        # Simulate the library being unavailable (e.g. missing in a CI environment)
+        svc._available = False
         history = _make_history(90)
         origin = history[-1][0]
 
         result = await svc.forecast("h1", history, horizon=14, origin=origin)
 
         assert svc.is_fallback is True
-        assert "not installed" in (svc.fallback_reason or "")
+        assert svc.fallback_reason is not None
         assert len(result) == 14
 
     @pytest.mark.anyio
