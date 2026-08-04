@@ -1,5 +1,9 @@
+from pathlib import Path
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+
+# Always resolve .env relative to this file (backend/app/core/config.py → backend/.env)
+_ENV_FILE = Path(__file__).resolve().parent.parent.parent / ".env"
 
 
 class Settings(BaseSettings):
@@ -40,7 +44,7 @@ class Settings(BaseSettings):
     forecast_governance_min_history_days: int = 14
     forecast_auto_selector_ttl_seconds: int = 3600
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = {"env_file": str(_ENV_FILE), "env_file_encoding": "utf-8"}
 
     @property
     def cors_origins(self) -> list[str]:
@@ -51,3 +55,9 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Cached settings singleton – use as a FastAPI dependency."""
     return Settings()
+
+
+def _bust_settings_cache() -> None:
+    """Clear the lru_cache so the next call re-reads the .env file.
+    Called automatically on uvicorn reload via app startup."""
+    get_settings.cache_clear()

@@ -11,7 +11,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import api_router
-from app.core.config import get_settings
+from app.core.config import get_settings, _bust_settings_cache
 from app.core.logging import configure_logging
 from app.db.session import create_tables, dispose_engine, _get_session_factory
 from app.services.seeder import seed_database
@@ -19,6 +19,8 @@ from app.services.seeder import seed_database
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    # Clear the lru_cache so .env is re-read on every (re)start
+    _bust_settings_cache()
     settings = get_settings()
     logger = logging.getLogger(__name__)
 
