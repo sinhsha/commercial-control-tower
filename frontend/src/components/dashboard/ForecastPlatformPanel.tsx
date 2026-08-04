@@ -230,13 +230,29 @@ function ModelPerformanceCards({ hotelId }: { hotelId: string }) {
 
 // ── Section 3: Model Comparison SVG Chart ─────────────────────────────────────
 
-function ComparisonChart({ hotelId }: { hotelId: string }) {
-  const [selectedModels, setSelectedModels] = useState<Set<string>>(new Set(['seasonal_baseline']));
-  const { data: comparison } = useForecastComparison(hotelId, 30);
-  const { data: baselineBacktest } = useForecastBacktest(hotelId, 'last_30', 'baseline');
+// Per-model colours for the comparison chart
+const MODEL_COLOURS: Record<string, string> = {
+  seasonal_baseline: '#6366f1',
+  timesfm: '#f59e0b',
+};
+const MODEL_DASH: Record<string, string> = {
+  seasonal_baseline: '5 3',
+  timesfm: '8 2',
+};
 
-  if (!baselineBacktest || !comparison) {
+function ComparisonChart({ hotelId }: { hotelId: string }) {
+  const [selectedModels, setSelectedModels] = useState<Set<string>>(
+    new Set(['seasonal_baseline', 'timesfm'])
+  );
+  const { data: comparison, loading: compLoading } = useForecastComparison(hotelId, 30);
+  const { data: baselineBacktest, loading: btLoading } = useForecastBacktest(hotelId, 'last_30', 'baseline');
+  const { data: timesfmBacktest } = useForecastBacktest(hotelId, 'last_30', 'timesfm');
+
+  if (compLoading || btLoading) {
     return <div style={{ fontSize: 13, color: '#57606a', padding: '12px 0' }}>Loading comparison…</div>;
+  }
+  if (!baselineBacktest || !comparison) {
+    return <div style={{ fontSize: 13, color: '#57606a' }}>No comparison data available</div>;
   }
 
   const points = baselineBacktest.points;
@@ -247,56 +263,66 @@ function ComparisonChart({ hotelId }: { hotelId: string }) {
   const toggleModel = (id: string) => {
     setSelectedModels((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) {
-        if (next.size > 1) next.delete(id);
-      } else {
-        next.add(id);
-      }
+      if (next.has(id)) { if (next.size > 1) next.delete(id); }
+      else { next.add(id); }
       return next;
     });
   };
 
-  // SVG chart dimensions
+  // Build per-model predicted series (keyed by model_id)
+  const modelPredictions: Record<string, number[]> = {
+    seasonal_baseline: points.map((p) => p.predicted),
+  };
+  if (timesfmBacktest && timesfmBacktest.points.length === points.length) {
+    modelPredictions['timesfm'] = timesfmBacktest.points.map((p) => p.predicted);
+  }
+
+  // y-axis range: don't clamp at 100 — let data drive the scale
+  const allOcc = [
+    ...points.map((p) => p.actual),
+    ...Object.values(modelPredictions).flat(),
+  ];
+  const minOcc = Math.max(0, Math.min(...allOcc) - 3);
+  const maxOcc = Math.min(105, Math.max(...allOcc) + 3);  // allow up to 105 so 100% values aren't clipped
+
   const W = 600, H = 200, PAD = { top: 12, right: 16, bottom: 36, left: 40 };
   const chartW = W - PAD.left - PAD.right;
   const chartH = H - PAD.top - PAD.bottom;
 
-  const allOcc = points.flatMap((p) => [p.actual, p.predicted]);
-  const minOcc = Math.max(0, Math.min(...allOcc) - 5);
-  const maxOcc = Math.min(100, Math.max(...allOcc) + 5);
-
   const xScale = (i: number) => PAD.left + (i / (points.length - 1)) * chartW;
   const yScale = (v: number) => PAD.top + chartH - ((v - minOcc) / (maxOcc - minOcc)) * chartH;
-
   const pathFor = (vals: number[]) =>
-    vals
-      .map((v, i) => `${i === 0 ? 'M' : 'L'}${xScale(i).toFixed(1)},${yScale(v).toFixed(1)}`)
-      .join(' ');
+    vals.map((v, i) => `${i === 0 ? 'M' : 'L'}${xScale(i).toFixed(1)},${yScale(v).toFixed(1)}`).join(' ');
 
-  // x-axis ticks: every 5 points
   const xTicks = points.filter((_, i) => i % 5 === 0 || i === points.length - 1);
-
-  // y-axis ticks
-  const yStep = Math.ceil((maxOcc - minOcc) / 5);
+  const yStep = Math.max(1, Math.ceil((maxOcc - minOcc) / 5));
   const yTicks: number[] = [];
   for (let v = Math.floor(minOcc); v <= maxOcc; v += yStep) yTicks.push(v);
+
+  // Build toggle labels from comparison + what we actually have data for
+  const modelLabels: Array<{ model_id: string; model_name: string }> = comparison.models.map((m) => ({
+    model_id: m.model_id,
+    model_name: m.model_name,
+  }));
 
   return (
     <div>
       {/* Model toggles */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
-        {comparison.models.map((m) => (
+        {modelLabels.map((m) => (
           <label key={m.model_id} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, cursor: 'pointer' }}>
             <input
               type="checkbox"
               checked={selectedModels.has(m.model_id)}
               onChange={() => toggleModel(m.model_id)}
             />
-            <span style={{ color: '#1f2328' }}>{m.model_name}</span>
+            <span style={{ color: MODEL_COLOURS[m.model_id] ?? '#57606a', fontWeight: 500 }}>
+              {m.model_name}
+            </span>
           </label>
         ))}
-        <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, cursor: 'pointer' }}>
-          <input type="checkbox" checked={true} readOnly />
+        <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}>
+          <input type="checkbox" checked readOnly />
           <span style={{ color: '#57606a' }}>Historical Actuals</span>
         </label>
       </div>
@@ -306,67 +332,40 @@ function ComparisonChart({ hotelId }: { hotelId: string }) {
         style={{ width: '100%', height: 'auto', overflow: 'visible' }}
         aria-label="Model comparison chart"
       >
-        {/* Grid lines */}
         {yTicks.map((v) => (
-          <line
-            key={v}
-            x1={PAD.left}
-            x2={W - PAD.right}
-            y1={yScale(v)}
-            y2={yScale(v)}
-            stroke="#f0f0f0"
-            strokeWidth={1}
-          />
+          <line key={v} x1={PAD.left} x2={W - PAD.right} y1={yScale(v)} y2={yScale(v)}
+            stroke="#f0f0f0" strokeWidth={1} />
         ))}
-
-        {/* y-axis labels */}
         {yTicks.map((v) => (
-          <text
-            key={v}
-            x={PAD.left - 4}
-            y={yScale(v) + 4}
-            textAnchor="end"
-            fontSize={9}
-            fill="#57606a"
-          >
+          <text key={v} x={PAD.left - 4} y={yScale(v) + 4} textAnchor="end" fontSize={9} fill="#57606a">
             {v}%
           </text>
         ))}
-
-        {/* x-axis labels */}
         {xTicks.map((p) => {
           const i = points.indexOf(p);
           return (
-            <text
-              key={p.date}
-              x={xScale(i)}
-              y={H - PAD.bottom + 14}
-              textAnchor="middle"
-              fontSize={9}
-              fill="#57606a"
-            >
-              {format(parseISO(p.date), 'MMM d')}
+            <text key={p.date} x={xScale(i)} y={H - PAD.bottom + 14}
+              textAnchor="middle" fontSize={9} fill="#57606a">
+              {format(parseISO(String(p.date)), 'MMM d')}
             </text>
           );
         })}
 
         {/* Actuals line */}
-        <path
-          d={pathFor(points.map((p) => p.actual))}
-          fill="none"
-          stroke="#3b82d4"
-          strokeWidth={2}
-        />
+        <path d={pathFor(points.map((p) => p.actual))} fill="none" stroke="#3b82d4" strokeWidth={2} />
 
-        {/* Baseline predicted */}
-        {selectedModels.has('seasonal_baseline') && (
-          <path
-            d={pathFor(points.map((p) => p.predicted))}
-            fill="none"
-            stroke="#6366f1"
-            strokeWidth={1.5}
-            strokeDasharray="5 3"
-          />
+        {/* Per-model forecast lines */}
+        {Object.entries(modelPredictions).map(([modelId, preds]) =>
+          selectedModels.has(modelId) ? (
+            <path
+              key={modelId}
+              d={pathFor(preds)}
+              fill="none"
+              stroke={MODEL_COLOURS[modelId] ?? '#999'}
+              strokeWidth={1.5}
+              strokeDasharray={MODEL_DASH[modelId] ?? '4 2'}
+            />
+          ) : null
         )}
       </svg>
 
@@ -376,13 +375,18 @@ function ComparisonChart({ hotelId }: { hotelId: string }) {
           <svg width={20} height={4}><line x1={0} y1={2} x2={20} y2={2} stroke="#3b82d4" strokeWidth={2} /></svg>
           Actuals
         </div>
-        {selectedModels.has('seasonal_baseline') && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <svg width={20} height={4}>
-              <line x1={0} y1={2} x2={20} y2={2} stroke="#6366f1" strokeWidth={1.5} strokeDasharray="5 3" />
-            </svg>
-            Baseline Forecast
-          </div>
+        {modelLabels.map((m) =>
+          selectedModels.has(m.model_id) ? (
+            <div key={m.model_id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <svg width={20} height={4}>
+                <line x1={0} y1={2} x2={20} y2={2}
+                  stroke={MODEL_COLOURS[m.model_id] ?? '#999'}
+                  strokeWidth={1.5}
+                  strokeDasharray={MODEL_DASH[m.model_id] ?? '4 2'} />
+              </svg>
+              {m.model_name}
+            </div>
+          ) : null
         )}
       </div>
     </div>

@@ -36,6 +36,13 @@ _WINDOW_DAYS: dict[str, int] = {
     "last_90": 90,
 }
 
+# Canonical display names for model IDs — used so the reported name
+# matches the requested model_id even when the service falls back.
+_MODEL_DISPLAY_NAMES: dict[str, str] = {
+    "seasonal_baseline": "Seasonal Baseline",
+    "timesfm": "TimesFM 2.5",
+}
+
 
 def _mae(actuals: list[float], predicted: list[float]) -> float:
     if not actuals:
@@ -138,9 +145,13 @@ class ForecastEvaluationService:
 
         bias_val = _bias(actuals, predicted)
 
+        # Use model_id as the canonical display name so "timesfm" always
+        # reports as "TimesFM" even when the service fell back to baseline.
+        display_name = _MODEL_DISPLAY_NAMES.get(model_id, self._svc.model_name)
+
         return EvaluationResult(
             model_id=model_id,
-            model_name=self._svc.model_name,
+            model_name=display_name,
             window=window,
             mae=round(_mae(actuals, predicted), 4),
             rmse=round(_rmse(actuals, predicted), 4),
@@ -167,7 +178,7 @@ class ForecastEvaluationService:
         if len(history) < min_required:
             return BacktestResult(
                 model_id=model_id,
-                model_name=self._svc.model_name,
+                model_name=_MODEL_DISPLAY_NAMES.get(model_id, self._svc.model_name),
                 window=window,
                 points=[],
                 mae=0.0, rmse=0.0, bias=0.0,
@@ -188,6 +199,8 @@ class ForecastEvaluationService:
         actuals_list: list[float] = []
         predicted_list: list[float] = []
 
+        display_name = _MODEL_DISPLAY_NAMES.get(model_id, self._svc.model_name)
+
         for (d, actual), fp in zip(hold_out, forecast_points):
             predicted = fp.occupancy_pct
             points.append(BacktestPoint(
@@ -203,7 +216,7 @@ class ForecastEvaluationService:
 
         return BacktestResult(
             model_id=model_id,
-            model_name=self._svc.model_name,
+            model_name=display_name,
             window=window,
             points=points,
             mae=round(_mae(actuals_list, predicted_list), 4),
