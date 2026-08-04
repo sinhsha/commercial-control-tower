@@ -19,6 +19,7 @@ import { ExplainabilityPanel } from '@/components/dashboard/ExplainabilityPanel'
 import { RecommendationsPanel } from '@/components/dashboard/RecommendationsPanel';
 import { AncillaryPanel } from '@/components/dashboard/AncillaryPanel';
 import { TotalRevenueBar } from '@/components/dashboard/TotalRevenueBar';
+import { CopilotPanel } from '@/components/dashboard/CopilotPanel';
 
 interface DashboardPanelProps {
   data: DashboardSummary;
@@ -392,6 +393,34 @@ export function DashboardPanel({
           data={ancillaryRecommendations}
           persona={ancillaryPersona}
           onPersonaChange={onAncillaryPersonaChange ?? (() => {})}
+        />
+      </SectionCard>
+
+      {/* ── Revenue Manager Copilot ──────────────────────────────────── */}
+      <SectionCard
+        title="Revenue Manager Copilot"
+        action={
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              color: '#1d4ed8',
+              background: '#eff6ff',
+              padding: '2px 8px',
+              borderRadius: 4,
+              letterSpacing: '0.04em',
+            }}
+          >
+            AI · Grounded
+          </span>
+        }
+      >
+        <CopilotPanel
+          hotelId={data.hotel_id}
+          dashboard={data}
+          recommendations={recommendations}
+          ancillaryRecommendations={ancillaryRecommendations}
+          persona={ancillaryPersona ?? 'hotel_wide'}
         />
       </SectionCard>
 

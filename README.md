@@ -19,14 +19,15 @@ hotel-control-tower/
 │   │   │   ├── events/           # Event impact calculations
 │   │   │   ├── market_signals/   # Market signal abstraction + mock
 │   │   │   ├── recommendations/  # Commercial recommendation engine
-│   │   │   └── ancillaries/      # Ancillary Revenue Engine ← NEW
+│   │   │   ├── ancillaries/      # Ancillary Revenue Engine
+│   │   │   └── copilot/          # Grounded LLM Explanation Service ← NEW
 │   │   └── repositories/     # Data access layer
 │   └── tests/
 ├── frontend/                 # React + TypeScript app (Vite)
 │   └── src/
 │       ├── components/       # Dashboard, UI primitives, Charts
-│       │   └── dashboard/    # RecommendationCard, AncillaryCard, AncillaryPanel, TotalRevenueBar ← NEW
-│       ├── hooks/            # Custom React hooks (useAncillaryRecommendations ← NEW)
+│       │   └── dashboard/    # RecommendationCard, AncillaryCard, AncillaryPanel, TotalRevenueBar, CopilotPanel ← NEW
+│       ├── hooks/            # Custom React hooks (useAncillaryRecommendations, useCopilot ← NEW)
 │       ├── services/         # API client layer
 │       └── types/            # Shared TypeScript types
 ├── docker-compose.yml
@@ -121,7 +122,7 @@ Score in [0, 100]. Priority assigned by threshold (75→critical, 55→high, 35�
 
 ---
 
-## 6 · Ancillary Revenue Optimization + Next-Best-Offer Engine ← NEW
+## 6 · Ancillary Revenue Optimization + Next-Best-Offer Engine
 
 A deterministic rule-based engine for 20 ancillary products across 9 categories.
 
@@ -161,15 +162,60 @@ A deterministic rule-based engine for 20 ancillary products across 9 categories.
 
 ---
 
+## 7 · Revenue Manager Copilot / Grounded Explanation Service ← NEW
+
+A grounded LLM explanation layer built on top of the deterministic engines.
+
+### What the Copilot Does
+| Surface | Description |
+|---------|-------------|
+| **Executive Summary** | 3–5 sentence GM-level narrative synthesising room + ancillary opportunity |
+| **Commercial Explanation** | 2–4 sentence explanation of a specific commercial action |
+| **Ancillary Explanation** | 2–3 sentence explanation of a ranked ancillary offer |
+| **Q&A** | Free-form revenue manager question answered with grounded context |
+
+### Grounding Contract
+The LLM is **never** given open access to the internet or unvalidated input.  Every prompt is assembled exclusively from structured data produced by the deterministic engines:
+- Hotel metrics (occupancy, ADR, RevPAR)
+- Forecast occupancy (baseline + event-adjusted)
+- Active demand events (name, type, attendance, distance)
+- Commercial recommendation context (title, action, revenue impact, reason codes)
+- Ancillary recommendation context (name, rank, pricing, propensity, margin)
+
+The existing **ExplainabilityPanel** (demand-event adjustment rationale) is **not replaced, duplicated, or modified** — it remains fully deterministic.
+
+### Graceful Degradation
+If `OPENAI_API_KEY` is not configured (or `COPILOT_ENABLED=false`), all copilot endpoints return structured fallback text built from the grounding data alone. All other dashboard panels are unaffected.
+
+### Configuration
+```bash
+# .env
+OPENAI_API_KEY=sk-...          # Leave empty to disable; fallback text still returned
+OPENAI_MODEL=gpt-4o-mini       # Any Chat Completions model
+COPILOT_ENABLED=true
+COPILOT_MAX_TOKENS=400
+```
+
+### To Swap LLM Provider
+1. Subclass `CopilotService` (`app/services/copilot/base.py`) and implement the four abstract methods.
+2. Change `get_copilot_service()` in `app/core/dependencies.py` to return the new implementation.
+3. No API, schema, or frontend changes required.
+
+---
+
 ## API Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/v1/hotels/{id}/recommendations` | List ranked commercial recommendations |
 | GET | `/api/v1/hotels/{id}/recommendations/{rec_id}` | Single recommendation detail |
-| GET | `/api/v1/hotels/{id}/ancillaries` | Full ancillary product catalog ← NEW |
-| GET | `/api/v1/hotels/{id}/ancillary-recommendations` | Ranked ancillary offers ← NEW |
-| GET | `/api/v1/hotels/{id}/ancillary-recommendations/{code}` | Single ancillary detail ← NEW |
+| GET | `/api/v1/hotels/{id}/ancillaries` | Full ancillary product catalog |
+| GET | `/api/v1/hotels/{id}/ancillary-recommendations` | Ranked ancillary offers |
+| GET | `/api/v1/hotels/{id}/ancillary-recommendations/{code}` | Single ancillary detail |
+| GET | `/api/v1/hotels/{id}/copilot/executive-summary` | LLM executive summary ← NEW |
+| POST | `/api/v1/hotels/{id}/copilot/ask` | Copilot Q&A ← NEW |
+| POST | `/api/v1/hotels/{id}/copilot/explain-commercial` | LLM explanation for a recommendation ← NEW |
+| POST | `/api/v1/hotels/{id}/copilot/explain-ancillary` | LLM explanation for an ancillary offer ← NEW |
 | GET | `/api/v1/hotels/{id}/forecast/adjusted` | Event-adjusted forecast |
 | GET | `/api/v1/hotels/{id}/forecast` | Baseline forecast |
 | GET | `/api/v1/hotels/{id}/events` | Active demand events |
@@ -241,7 +287,7 @@ GET /api/v1/hotels/{id}/recommendations
 
 ## Running Tests
 
-**Backend** (120 tests across 5 test files):
+**Backend** (155 tests across 7 test files):
 ```bash
 cd backend
 python -m pytest -v
@@ -256,6 +302,48 @@ npm test
 ---
 
 ## Demo Scenario
+
+### Copilot Demo ← NEW
+1. **Start the app**: `docker compose up --build`
+2. **Open**: http://localhost:5173 → select a hotel
+3. **Scroll to "Revenue Manager Copilot"** (below Ancillary panel)
+4. **Observe the Executive Summary** — a 3–5 sentence GM narrative appears automatically, grounded in live occupancy, ADR, forecast, and top commercial + ancillary actions
+5. **Try the Q&A chat** — type a question such as:
+   - *"Should I raise rates this weekend?"*
+   - *"What ancillary offers should I prioritise for conference attendees?"*
+   - *"How does the upcoming event affect my revenue strategy?"*
+   - Or click a suggestion chip to pre-fill the input
+6. **Without an API key** — all responses gracefully fall back to structured text derived from deterministic engine output (no blank panels)
+7. **Set `OPENAI_API_KEY=sk-...`** in `.env` and restart → real GPT-4o-mini explanations appear
+
+#### API Demo (copilot)
+```bash
+# Executive summary
+curl "http://localhost:8000/api/v1/hotels/{hotel_id}/copilot/executive-summary?persona=hotel_wide&days=14"
+
+# Q&A
+curl -X POST http://localhost:8000/api/v1/hotels/{hotel_id}/copilot/ask \
+  -H "Content-Type: application/json" \
+  -d '{
+    "grounding": {
+      "question": "Should I raise rates this weekend?",
+      "hotel_name": "Grand Plaza Hotel",
+      "as_of_date": "2025-08-01",
+      "current_occupancy_pct": 72.5,
+      "forecast_occupancy_pct": 84.0,
+      "current_adr": 279,
+      "competitor_adr": 265,
+      "active_events": [],
+      "top_commercial_actions": ["Increase Weekend Rate"],
+      "top_ancillary_offers": [],
+      "room_revenue_opportunity": 18000,
+      "ancillary_revenue_opportunity": 7500,
+      "persona": "hotel_wide"
+    }
+  }'
+```
+
+---
 
 ### Commercial Recommendations Demo
 1. **Start the app**: `docker compose up --build`
@@ -314,6 +402,7 @@ The architecture is designed for incremental AI capability addition:
 | **Propensity Scorer** | `PropensityScoringService` (deterministic) | ML propensity model (same interface) |
 | **Market Signals** | `MockMarketSignalService` | `LiveRateShopMarketSignalService` |
 | **Ancillary Catalog** | `SeededAncillaryCatalogService` | `DBBackedAncillaryCatalogService` |
+| **Copilot / LLM** | `OpenAICopilotService` (GPT-4o-mini) | `AnthropicCopilotService` / `WatsonXCopilotService` |
 
 To swap any engine: change **one factory function** in `app/core/dependencies.py`. No API, schema, or frontend changes required.
 

@@ -22,6 +22,12 @@ class Settings(BaseSettings):
     # Future: External rate-shopping / demand-data feeds
     rate_shop_api_key: str | None = None
 
+    # LLM / Copilot
+    openai_api_key: str | None = None
+    openai_model: str = "gpt-4o-mini"
+    copilot_enabled: bool = True
+    copilot_max_tokens: int = 600
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
     @property

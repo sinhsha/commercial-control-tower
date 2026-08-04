@@ -343,3 +343,98 @@ export type ApiState<T> =
   | { status: 'loading' }
   | { status: 'success'; data: T }
   | { status: 'error'; error: string };
+
+// ── Copilot / Grounded Explanation Service ────────────────────────────────────
+
+export type CopilotSurface =
+  | 'commercial_recommendation'
+  | 'ancillary_recommendation'
+  | 'executive_summary'
+  | 'copilot_question';
+
+export type CopilotStatus = 'ok' | 'unavailable' | 'error';
+
+export interface CopilotResponse {
+  surface: CopilotSurface;
+  status: CopilotStatus;
+  explanation: string;
+  model_used: string;
+  tokens_used: number;
+  generated_at: string;
+  fallback_reason: string | null;
+}
+
+/** Structured context for a commercial recommendation explanation. */
+export interface CommercialGrounding {
+  hotel_name: string;
+  as_of_date: string;
+  current_occupancy_pct: number;
+  forecast_occupancy_pct: number;
+  current_adr: number;
+  competitor_adr: number;
+  booking_pace_index: number;
+  active_events: Array<Record<string, unknown>>;
+  recommendation_title: string;
+  recommendation_action: string;
+  recommendation_category: string;
+  current_value: number | null;
+  recommended_value: number | null;
+  unit: string;
+  expected_revenue_impact: number;
+  reason_codes: string[];
+  supporting_factors: string[];
+  risk_flags: string[];
+  priority: string;
+  confidence: string;
+}
+
+/** Structured context for an ancillary recommendation explanation. */
+export interface AncillaryGrounding {
+  hotel_name: string;
+  persona: string;
+  forecast_occupancy_pct: number;
+  active_events: Array<Record<string, unknown>>;
+  ancillary_name: string;
+  ancillary_category: string;
+  rank: number;
+  base_price: number;
+  recommended_price: number;
+  price_change_pct: number;
+  purchase_probability: number;
+  expected_revenue: number;
+  expected_margin: number;
+  opportunity_score: number;
+  reason_codes: string[];
+  supporting_factors: string[];
+  guardrails_applied: string[];
+  score_components: Record<string, number>;
+}
+
+/** Free-form Q&A context sent with each copilot question. */
+export interface CopilotQuestion {
+  question: string;
+  hotel_name: string;
+  as_of_date: string;
+  current_occupancy_pct: number;
+  forecast_occupancy_pct: number;
+  current_adr: number;
+  competitor_adr: number;
+  active_events: Array<Record<string, unknown>>;
+  top_commercial_actions: string[];
+  top_ancillary_offers: string[];
+  room_revenue_opportunity: number;
+  ancillary_revenue_opportunity: number;
+  persona: string;
+}
+
+export interface CopilotAskRequest {
+  grounding: CopilotQuestion;
+}
+
+export interface ExplainCommercialRequest {
+  grounding: CommercialGrounding;
+}
+
+export interface ExplainAncillaryRequest {
+  grounding: AncillaryGrounding;
+}

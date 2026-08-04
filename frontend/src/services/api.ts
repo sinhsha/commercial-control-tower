@@ -1,7 +1,11 @@
 import type {
   AdjustedForecastResponse,
+  CopilotAskRequest,
+  CopilotResponse,
   DashboardSummary,
   DailyMetricsListResponse,
+  ExplainAncillaryRequest,
+  ExplainCommercialRequest,
   EventListResponse,
   ForecastResponse,
   HealthResponse,
@@ -178,6 +182,44 @@ export const adjustedForecastApi = {
     if (asOf) params.set('as_of', asOf);
     return request(`/hotels/${hotelId}/forecast/adjusted?${params}`);
   },
+};
+
+// ── Copilot ───────────────────────────────────────────────────────────────────
+
+export const copilotApi = {
+  /** GET executive summary (fetches its own context server-side). */
+  executiveSummary: (
+    hotelId: string,
+    params?: { persona?: string; days?: number; as_of?: string }
+  ): Promise<CopilotResponse> => {
+    const p = new URLSearchParams();
+    if (params?.persona) p.set('persona', params.persona);
+    if (params?.days) p.set('days', String(params.days));
+    if (params?.as_of) p.set('as_of', params.as_of);
+    const qs = p.toString();
+    return request(`/hotels/${hotelId}/copilot/executive-summary${qs ? `?${qs}` : ''}`);
+  },
+
+  /** POST free-form revenue manager question. */
+  ask: (hotelId: string, body: CopilotAskRequest): Promise<CopilotResponse> =>
+    request(`/hotels/${hotelId}/copilot/ask`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  /** POST explanation for a commercial recommendation. */
+  explainCommercial: (hotelId: string, body: ExplainCommercialRequest): Promise<CopilotResponse> =>
+    request(`/hotels/${hotelId}/copilot/explain-commercial`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  /** POST explanation for an ancillary recommendation. */
+  explainAncillary: (hotelId: string, body: ExplainAncillaryRequest): Promise<CopilotResponse> =>
+    request(`/hotels/${hotelId}/copilot/explain-ancillary`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
 };
 
 // ── Health ────────────────────────────────────────────────────────────────────

@@ -40,6 +40,8 @@ from app.services.recommendations.rule_based import RuleBasedRecommendationServi
 from app.services.ancillaries.base import AncillaryRecommendationService
 from app.services.ancillaries.catalog import AncillaryCatalogService, SeededAncillaryCatalogService
 from app.services.ancillaries.rule_based import RuleBasedAncillaryRecommendationService
+from app.services.copilot.base import CopilotService
+from app.services.copilot.openai_service import OpenAICopilotService
 
 
 # ── Repositories ─────────────────────────────────────────────────────────────
@@ -176,3 +178,20 @@ def get_ancillary_recommendation_service(
         forecast_svc=forecast_svc,
         catalog_svc=catalog_svc,
     )
+
+
+# ── Copilot / Grounded Explanation Service ────────────────────────────────────
+
+def get_copilot_service() -> CopilotService:
+    """
+    Factory for the active copilot / grounded LLM explanation service.
+
+    Swap this return value to change the LLM provider project-wide:
+        return AnthropicCopilotService()
+        return WatsonXCopilotService()
+
+    When OPENAI_API_KEY is not configured or copilot_enabled=false,
+    OpenAICopilotService automatically degrades to structured fallback text.
+    All other dashboard panels are unaffected.
+    """
+    return OpenAICopilotService()
