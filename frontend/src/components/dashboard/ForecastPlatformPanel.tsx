@@ -547,9 +547,16 @@ function BacktestChart({ hotelId }: { hotelId: string }) {
 
 // ── Section 5: Model Selector ─────────────────────────────────────────────────
 
-function ModelSelector({ timesfmStatus }: { timesfmStatus: string | undefined }) {
+function ModelSelector({
+  timesfmStatus,
+  activeModel,
+}: {
+  timesfmStatus: string | undefined;
+  activeModel: string | undefined;
+}) {
   const [selected, setSelected] = useState<'baseline' | 'timesfm' | 'auto'>('baseline');
   const timesfmAvailable = timesfmStatus === 'active';
+  const timesfmIsRunning = activeModel === 'timesfm';
 
   return (
     <div>
@@ -603,9 +610,15 @@ function ModelSelector({ timesfmStatus }: { timesfmStatus: string | undefined })
             ⚠ TimesFM not yet available — will fall back to Seasonal Baseline.
           </span>
         )}
-        {selected === 'timesfm' && timesfmAvailable && (
+        {selected === 'timesfm' && timesfmAvailable && timesfmIsRunning && (
           <span style={{ color: '#166534', marginLeft: 8 }}>
-            ✓ TimesFM 2.5 is ready. Model weights will be downloaded on first inference (~800 MB).
+            ✓ TimesFM 2.5 is active and running.
+          </span>
+        )}
+        {selected === 'timesfm' && timesfmAvailable && !timesfmIsRunning && (
+          <span style={{ color: '#d97706', marginLeft: 8 }}>
+            ⚠ TimesFM is installed but backend is currently running{' '}
+            {activeModel ?? 'another model'}. Set FORECAST_PROVIDER=timesfm and restart.
           </span>
         )}
       </div>
@@ -658,17 +671,23 @@ export function ForecastPlatformPanel({ hotelId }: ForecastPlatformPanelProps) {
 
       {/* Section 5: Model Selector */}
       <SectionCard title="Model Selector">
-        <ModelSelectorWithRegistry />
+        <ModelSelectorWithRegistry hotelId={hotelId} />
       </SectionCard>
 
     </div>
   );
 }
 
-function ModelSelectorWithRegistry() {
-  const { data } = useForecastModels();
-  const timesfmEntry = data?.models.find(
+function ModelSelectorWithRegistry({ hotelId }: { hotelId: string }) {
+  const { data: modelsData } = useForecastModels();
+  const { data: healthData } = useForecastHealth(hotelId);
+  const timesfmEntry = modelsData?.models.find(
     (m: import('@/types/api').ForecastModelInfo) => m.model_id === 'timesfm'
   );
-  return <ModelSelector timesfmStatus={timesfmEntry?.status} />;
+  return (
+    <ModelSelector
+      timesfmStatus={timesfmEntry?.status}
+      activeModel={healthData?.active_model}
+    />
+  );
 }
