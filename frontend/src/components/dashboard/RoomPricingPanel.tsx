@@ -1,11 +1,10 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import type {
   RoomPricingResponse,
   RoomCalendarResponse,
   InventoryResponse,
   RoomTypePricingRecommendation,
 } from '@/types/api';
-import { KpiCard } from '@/components/ui/KpiCard';
 import { SectionCard } from '@/components/ui/SectionCard';
 import { useRoomPricing, useRoomCalendar, useRoomInventory } from '@/hooks/useRoomPricing';
 
@@ -56,9 +55,248 @@ function fmtMoney(n: number): string {
   return `$${n.toFixed(0)}`;
 }
 
-// ── Section 1: Projected KPI Strip ───────────────────────────────────────────
+// ── Section 1: Projected KPI Strip (clickable drill-down) ────────────────────
+
+type DrillDownKey = 'adr' | 'revpar' | 'revenue' | 'occupancy' | 'opportunity' | null;
+
+function ClickableKpiCard({
+  label,
+  value,
+  subtext,
+  trend,
+  accent,
+  active,
+  onClick,
+}: {
+  label: string;
+  value: string;
+  subtext?: string;
+  trend?: 'up' | 'down' | 'neutral';
+  accent?: boolean;
+  active: boolean;
+  onClick: () => void;
+}) {
+  const trendArrow = { up: '↑', down: '↓', neutral: '→' } as const;
+  const trendColor = { up: '#16a34a', down: '#dc2626', neutral: '#6b7280' } as const;
+
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        background: accent ? '#1e3a5f' : '#ffffff',
+        border: active
+          ? `2px solid ${accent ? '#60a5fa' : '#3b82d4'}`
+          : `1px solid ${accent ? '#2d5a8e' : '#e5e7eb'}`,
+        borderRadius: 8,
+        padding: active ? '19px 23px' : '20px 24px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 6,
+        minWidth: 0,
+        cursor: 'pointer',
+        transition: 'box-shadow 0.15s, border 0.15s',
+        boxShadow: active ? '0 0 0 3px rgba(59,130,212,0.15)' : 'none',
+        position: 'relative',
+      }}
+    >
+      {/* Active indicator dot */}
+      {active && (
+        <div style={{
+          position: 'absolute', top: 8, right: 10,
+          width: 6, height: 6, borderRadius: '50%',
+          background: accent ? '#60a5fa' : '#3b82d4',
+        }} />
+      )}
+      <span style={{
+        fontSize: 11, fontWeight: 600, letterSpacing: '0.06em',
+        textTransform: 'uppercase' as const,
+        color: accent ? '#93c5fd' : '#57606a',
+      }}>
+        {label}
+      </span>
+      <div style={{
+        fontSize: 32, fontWeight: 700, lineHeight: 1.1,
+        color: accent ? '#ffffff' : '#1f2328', letterSpacing: '-0.02em',
+      }}>
+        {value}
+      </div>
+      {(subtext || trend) && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+          {trend && (
+            <span style={{ color: trendColor[trend], fontSize: 13, fontWeight: 600 }}>
+              {trendArrow[trend]}
+            </span>
+          )}
+          {subtext && (
+            <span style={{ fontSize: 12, color: accent ? '#93c5fd' : '#57606a' }}>
+              {subtext}
+            </span>
+          )}
+        </div>
+      )}
+      {/* Click hint */}
+      <span style={{ fontSize: 10, color: accent ? '#7dd3fc' : '#9ca3af', marginTop: 2 }}>
+        {active ? '▲ hide breakdown' : '▼ see breakdown'}
+      </span>
+    </div>
+  );
+}
+
+// ── Drill-down drawer ─────────────────────────────────────────────────────────
+
+function DrillDownDrawer({
+  metric,
+  data,
+}: {
+  metric: DrillDownKey;
+  data: RoomPricingResponse;
+}) {
+  if (!metric || data.recommendations.length === 0) return null;
+
+  const recs = [...data.recommendations].sort((a, b) => a.room_rank - b.room_rank);
+  const soldEstimate = (r: RoomTypePricingRecommendation) =>
+    r.inventory_count - r.current_available;
+
+  // Build per-room rows depending on which metric was clicked
+  const rows = recs.map((r) => {
+    const sold = soldEstimate(r);
+
+    switch (metric) {
+      case 'adr': return {
+        label: r.display_name,
+        current: `$${r.current_price.toFixed(0)}`,
+        projected: `$${r.recommended_price.toFixed(0)}`,
+        delta: r.price_change_pct,
+        bar: r.recommended_price / (data.projected_adr * 2),
+        note: r.reason_codes.slice(0, 1).join(', ') || '—',
+      };
+      case 'revpar': {
+        const occ = r.inventory_count > 0 ? sold / r.inventory_count : 0;
+        const revpar = r.recommended_price * occ;
+        const curRevpar = r.current_price * occ;
+        return {
+          label: r.display_name,
+          current: `$${curRevpar.toFixed(0)}`,
+          projected: `$${revpar.toFixed(0)}`,
+          delta: curRevpar > 0 ? ((revpar - curRevpar) / curRevpar) * 100 : 0,
+          bar: revpar / (data.projected_revpar * 2),
+          note: `${(occ * 100).toFixed(0)}% occ · ${r.inventory_count} rooms`,
+        };
+      }
+      case 'revenue': {
+        const rev = r.recommended_price * sold;
+        const curRev = r.current_price * sold;
+        return {
+          label: r.display_name,
+          current: fmtMoney(curRev),
+          projected: fmtMoney(rev),
+          delta: curRev > 0 ? ((rev - curRev) / curRev) * 100 : 0,
+          bar: rev / (data.projected_room_revenue * 0.6 + 1),
+          note: `${sold} rooms sold est.`,
+        };
+      }
+      case 'occupancy': {
+        const occ = r.inventory_count > 0 ? sold / r.inventory_count : 0;
+        return {
+          label: r.display_name,
+          current: `${(occ * 100).toFixed(0)}%`,
+          projected: `${(occ * 100).toFixed(0)}%`,
+          delta: 0,
+          bar: occ,
+          note: `${sold} / ${r.inventory_count} rooms`,
+        };
+      }
+      case 'opportunity': {
+        const opp = (r.recommended_price - r.current_price) * sold;
+        return {
+          label: r.display_name,
+          current: fmtMoney(r.current_price * sold),
+          projected: fmtMoney(r.recommended_price * sold),
+          delta: r.price_change_pct,
+          bar: Math.max(0, opp) / (data.projected_revenue_opportunity * 0.6 + 1),
+          note: opp >= 0 ? `+${fmtMoney(opp)} opportunity` : `${fmtMoney(opp)} risk`,
+        };
+      }
+      default: return {
+        label: r.display_name, current: '—', projected: '—', delta: 0, bar: 0, note: '',
+      };
+    }
+  });
+
+  const metricLabels: Record<NonNullable<DrillDownKey>, string> = {
+    adr: 'ADR by Room Type',
+    revpar: 'RevPAR by Room Type',
+    revenue: 'Revenue by Room Type',
+    occupancy: 'Occupancy by Room Type',
+    opportunity: 'Revenue Opportunity by Room Type',
+  };
+
+  return (
+    <div style={{
+      border: '1px solid #e5e7eb',
+      borderRadius: 8,
+      background: '#f7f8fa',
+      padding: '16px 20px',
+      marginTop: -8,
+    }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: '#1f2328', marginBottom: 12,
+        textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        {metricLabels[metric]}
+      </div>
+
+      {/* Header */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px 60px 1fr 100px',
+        gap: 8, fontSize: 10, fontWeight: 600, color: '#57606a',
+        textTransform: 'uppercase', letterSpacing: '0.04em',
+        borderBottom: '1px solid #e5e7eb', paddingBottom: 6, marginBottom: 8 }}>
+        <span>Room Type</span>
+        <span style={{ textAlign: 'right' }}>Current</span>
+        <span style={{ textAlign: 'right' }}>Projected</span>
+        <span style={{ textAlign: 'right' }}>Δ</span>
+        <span style={{ paddingLeft: 8 }}>Contribution</span>
+        <span>Note</span>
+      </div>
+
+      {/* Rows */}
+      {rows.map((row, i) => (
+        <div key={i} style={{ display: 'grid',
+          gridTemplateColumns: '1fr 80px 80px 60px 1fr 100px',
+          gap: 8, alignItems: 'center', padding: '5px 0',
+          borderBottom: i < rows.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
+          <span style={{ fontSize: 12, fontWeight: 500, color: '#1f2328' }}>{row.label}</span>
+          <span style={{ fontSize: 12, color: '#57606a', textAlign: 'right' }}>{row.current}</span>
+          <span style={{ fontSize: 12, fontWeight: 600, color: '#1f2328', textAlign: 'right' }}>
+            {row.projected}
+          </span>
+          <span style={{ fontSize: 11, fontWeight: 600, textAlign: 'right',
+            color: row.delta > 0 ? '#16a34a' : row.delta < 0 ? '#dc2626' : '#6b7280' }}>
+            {row.delta !== 0 ? `${row.delta > 0 ? '+' : ''}${row.delta.toFixed(1)}%` : '—'}
+          </span>
+          {/* Mini bar */}
+          <div style={{ paddingLeft: 8 }}>
+            <div style={{ height: 6, borderRadius: 3, background: '#e5e7eb', overflow: 'hidden' }}>
+              <div style={{
+                height: '100%', borderRadius: 3,
+                background: '#3b82d4',
+                width: `${Math.min(100, Math.max(0, row.bar * 100)).toFixed(1)}%`,
+                transition: 'width 0.3s',
+              }} />
+            </div>
+          </div>
+          <span style={{ fontSize: 10, color: '#6b7280' }}>{row.note}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function ProjectedKpiStrip({ data }: { data: RoomPricingResponse }) {
+  const [active, setActive] = useState<DrillDownKey>(null);
+
+  const toggle = useCallback((key: DrillDownKey) => {
+    setActive((prev) => (prev === key ? null : key));
+  }, []);
+
   const currentAdr =
     data.recommendations.length > 0
       ? data.recommendations.reduce((s, r) => s + r.current_price, 0) /
@@ -70,44 +308,51 @@ function ProjectedKpiStrip({ data }: { data: RoomPricingResponse }) {
   const revparDelta = data.projected_revpar - currentRevpar;
 
   return (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-        gap: 12,
-      }}
-    >
-      <KpiCard
-        label="Projected ADR"
-        value={`$${data.projected_adr.toFixed(0)}`}
-        subtext={`${adrDelta >= 0 ? '+' : ''}$${adrDelta.toFixed(0)} vs current`}
-        trend={adrDelta >= 0 ? 'up' : 'down'}
-      />
-      <KpiCard
-        label="Projected RevPAR"
-        value={`$${data.projected_revpar.toFixed(0)}`}
-        subtext={`${revparDelta >= 0 ? '+' : ''}$${revparDelta.toFixed(0)} vs current`}
-        trend={revparDelta >= 0 ? 'up' : 'down'}
-      />
-      <KpiCard
-        label="Projected Revenue"
-        value={fmtMoney(data.projected_room_revenue)}
-        subtext="room revenue"
-        trend="neutral"
-      />
-      <KpiCard
-        label="Projected Occupancy"
-        value={`${data.projected_occupancy_pct.toFixed(1)}%`}
-        subtext={`Forecast: ${data.forecast_occupancy_pct.toFixed(1)}%`}
-        trend={data.projected_occupancy_pct >= 70 ? 'up' : 'neutral'}
-      />
-      <KpiCard
-        label="Revenue Opportunity"
-        value={fmtMoney(data.projected_revenue_opportunity)}
-        subtext="vs current pricing"
-        trend={data.projected_revenue_opportunity >= 0 ? 'up' : 'down'}
-        accent
-      />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+        <ClickableKpiCard
+          label="Projected ADR"
+          value={`$${data.projected_adr.toFixed(0)}`}
+          subtext={`${adrDelta >= 0 ? '+' : ''}$${adrDelta.toFixed(0)} vs current`}
+          trend={adrDelta >= 0 ? 'up' : 'down'}
+          active={active === 'adr'}
+          onClick={() => toggle('adr')}
+        />
+        <ClickableKpiCard
+          label="Projected RevPAR"
+          value={`$${data.projected_revpar.toFixed(0)}`}
+          subtext={`${revparDelta >= 0 ? '+' : ''}$${revparDelta.toFixed(0)} vs current`}
+          trend={revparDelta >= 0 ? 'up' : 'down'}
+          active={active === 'revpar'}
+          onClick={() => toggle('revpar')}
+        />
+        <ClickableKpiCard
+          label="Projected Revenue"
+          value={fmtMoney(data.projected_room_revenue)}
+          subtext="room revenue"
+          trend="neutral"
+          active={active === 'revenue'}
+          onClick={() => toggle('revenue')}
+        />
+        <ClickableKpiCard
+          label="Projected Occupancy"
+          value={`${data.projected_occupancy_pct.toFixed(1)}%`}
+          subtext={`Forecast: ${data.forecast_occupancy_pct.toFixed(1)}%`}
+          trend={data.projected_occupancy_pct >= 70 ? 'up' : 'neutral'}
+          active={active === 'occupancy'}
+          onClick={() => toggle('occupancy')}
+        />
+        <ClickableKpiCard
+          label="Revenue Opportunity"
+          value={fmtMoney(data.projected_revenue_opportunity)}
+          subtext="vs current pricing"
+          trend={data.projected_revenue_opportunity >= 0 ? 'up' : 'down'}
+          accent
+          active={active === 'opportunity'}
+          onClick={() => toggle('opportunity')}
+        />
+      </div>
+      <DrillDownDrawer metric={active} data={data} />
     </div>
   );
 }
