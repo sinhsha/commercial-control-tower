@@ -74,18 +74,19 @@ def _build_default_registry() -> ForecastModelRegistry:
         status="active",
     ))
 
-    # Determine TimesFM availability
+    # Determine TimesFM availability — requires both timesfm and torch packages
     try:
-        import importlib
-        importlib.util.find_spec("timesfm")
-        timesfm_status: ModelStatus = "active"
+        import importlib.util
+        _timesfm_ok = importlib.util.find_spec("timesfm") is not None
+        _torch_ok   = importlib.util.find_spec("torch")   is not None
+        timesfm_status: ModelStatus = "active" if (_timesfm_ok and _torch_ok) else "degraded"
     except Exception:
         timesfm_status = "degraded"
 
     registry.register(ModelEntry(
         model_id="timesfm",
-        name="TimesFM",
-        version="1.0.0",
+        name="TimesFM 2.5",
+        version="2.0.2",
         provider="google",
         device="cpu",
         supported_horizons=list(range(1, 97)),
@@ -96,6 +97,9 @@ def _build_default_registry() -> ForecastModelRegistry:
     return registry
 
 
+# Singleton is rebuilt each time get_default_registry() is called from a
+# fresh DI scope — no module-level caching so availability is re-evaluated
+# after a reinstall without needing a full process restart.
 _default_registry: ForecastModelRegistry | None = None
 
 
@@ -104,3 +108,9 @@ def get_default_registry() -> ForecastModelRegistry:
     if _default_registry is None:
         _default_registry = _build_default_registry()
     return _default_registry
+
+
+def reset_default_registry() -> None:
+    """Force registry rebuild on next get_default_registry() call (useful in tests)."""
+    global _default_registry
+    _default_registry = None
