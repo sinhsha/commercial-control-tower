@@ -41,8 +41,7 @@ jobs:
         run: |
           ibmcloud login \
             --apikey "${{ secrets.IBMCLOUD_API_KEY }}" \
-            -r "$IBM_REGION" \
-            -g "${{ secrets.RG_NAME }}"
+            -r "$IBM_REGION"
           ibmcloud cr region-set "$IBM_REGION"
           ibmcloud cr login
 
@@ -135,8 +134,7 @@ jobs:
         run: |
           ibmcloud login \
             --apikey "${{ secrets.IBMCLOUD_API_KEY }}" \
-            -r "$IBM_REGION" \
-            -g "${{ secrets.RG_NAME }}"
+            -r "$IBM_REGION"
           ibmcloud cr region-set "$IBM_REGION"
           ibmcloud cr login
 
